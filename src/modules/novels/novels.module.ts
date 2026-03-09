@@ -6,6 +6,7 @@ import { NovelAlias } from './entities/novel-alias.entity.js';
 import { Chapter } from './entities/chapter.entity.js';
 import { ChapterTranslation } from './entities/chapter-translation.entity.js';
 import { NovelsService } from './novels.service.js';
+import { NovelsController } from './novels.controller';
 
 @Module({
   imports: [
@@ -19,5 +20,6 @@ import { NovelsService } from './novels.service.js';
   ],
   providers: [NovelsService],
   exports: [TypeOrmModule, NovelsService],
+  controllers: [NovelsController],
 })
 export class NovelsModule {}

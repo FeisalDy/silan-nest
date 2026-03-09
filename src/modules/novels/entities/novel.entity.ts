@@ -6,6 +6,7 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Author } from '../../authors/entities/author.entity.js';
 import { NovelTranslation } from './novel-translation.entity.js';

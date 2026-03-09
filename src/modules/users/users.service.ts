@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -28,6 +32,22 @@ export class UsersService {
   }
 
   async create(createUserDto: CreateUserDto) {
+    const existingUser = await this.usersRepository.findOne({
+      where: [
+        { email: createUserDto.email },
+        {
+          username: createUserDto.email.substring(
+            0,
+            createUserDto.email.lastIndexOf('@'),
+          ),
+        },
+      ],
+    });
+    if (existingUser) {
+      throw new ConflictException(
+        'User with this email or username already exists',
+      );
+    }
     const readerRole = await this.roleRepository.findOneBy({ name: 'reader' });
     if (!readerRole) {
       throw new InternalServerErrorException('Role "reader" not initialized');
