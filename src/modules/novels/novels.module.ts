@@ -5,6 +5,8 @@ import { NovelTranslation } from './entities/novel-translation.entity.js';
 import { NovelAlias } from './entities/novel-alias.entity.js';
 import { Chapter } from './entities/chapter.entity.js';
 import { ChapterTranslation } from './entities/chapter-translation.entity.js';
+import { Author } from './entities/author.entity.js';
+import { AuthorTranslation } from './entities/author-translation.entity.js';
 import { NovelsService } from './novels.service.js';
 import { NovelsController } from './novels.controller';
 
@@ -16,6 +18,8 @@ import { NovelsController } from './novels.controller';
       NovelAlias,
       Chapter,
       ChapterTranslation,
+      Author,
+      AuthorTranslation,
     ]),
   ],
   providers: [NovelsService],

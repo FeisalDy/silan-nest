@@ -9,7 +9,9 @@ export class NovelsController {
   constructor(private readonly novelsService: NovelsService) {}
 
   @Get()
-  async findAll(@Query() pageOptionsDto: PageOptionsDto): Promise<PageDto<Novel>> {
+  async findAll(
+    @Query() pageOptionsDto: PageOptionsDto,
+  ): Promise<PageDto<Novel>> {
     return this.novelsService.findAll(pageOptionsDto);
   }
 }

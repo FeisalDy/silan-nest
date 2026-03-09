@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { AuthorTranslation } from './author-translation.entity.js';
-import { Novel } from '../../novels/entities/novel.entity.js';
+import { Novel } from './novel.entity.js';
 
 @Entity('authors')
 export class Author {

@@ -6,9 +6,8 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
-  UpdateDateColumn,
 } from 'typeorm';
-import { Author } from '../../authors/entities/author.entity.js';
+import { Author } from './author.entity.js';
 import { NovelTranslation } from './novel-translation.entity.js';
 import { NovelAlias } from './novel-alias.entity.js';
 import { Chapter } from './chapter.entity.js';
