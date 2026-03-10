@@ -19,6 +19,9 @@ import { isUUID } from 'class-validator';
 import { Lang } from '../../common/constants/lang.constant';
 import { Chapter } from './entities/chapter.entity';
 import { ChapterDto } from './dto/chapter.dto';
+import { NovelTranslation } from './entities/novel-translation.entity';
+import { AuthorTranslation } from './entities/author-translation.entity';
+import { ChapterTranslation } from './entities/chapter-translation.entity';
 
 @Injectable()
 export class NovelsService {
@@ -33,47 +36,49 @@ export class NovelsService {
     private novelImportQueue: Queue<NovelImportJobPayload>,
   ) {}
 
-  async paginateNovels(
-    pageOptionsDto: PageOptionsDto,
-  ): Promise<PageDto<NovelDto>> {
-    const lang = Lang.ENGLISH;
-    const queryBuilder = this.novelsRepository.createQueryBuilder('novel');
+  async paginateNovels(pageOptionsDto: PageOptionsDto) {
+    const baseQuery = () => {
+      const qb = this.novelsRepository
+        .createQueryBuilder('novel')
+        .leftJoinAndSelect(
+          'novel.translations',
+          'translation',
+          'translation.language_code = :lang OR translation.is_default = true',
+          { lang: Lang.ENGLISH },
+        )
+        .leftJoinAndSelect('novel.author', 'author')
+        .leftJoinAndSelect(
+          'author.translations',
+          'authorTrans',
+          'authorTrans.language_code = :lang OR authorTrans.is_default = true',
+          { lang: Lang.ENGLISH },
+        )
+        .leftJoinAndSelect('novel.aliases', 'alias');
 
-    queryBuilder
-      .leftJoinAndSelect(
-        'novel.translations',
-        'translation',
-        'translation.language_code = :lang',
-        { lang },
-      )
-      .leftJoinAndSelect('novel.author', 'author')
-      .leftJoinAndSelect(
-        'author.translations',
-        'authorTrans',
-        'authorTrans.language_code = :lang',
-        { lang },
-      )
-      .leftJoinAndSelect('novel.aliases', 'alias');
+      if (pageOptionsDto.q) {
+        qb.andWhere(
+          new Brackets((inner) => {
+            inner
+              .where('translation.title ILIKE :q', {
+                q: `%${pageOptionsDto.q}%`,
+              })
+              .orWhere('alias.alias_title ILIKE :q', {
+                q: `%${pageOptionsDto.q}%`,
+              });
+          }),
+        );
+      }
 
-    if (pageOptionsDto.q) {
-      queryBuilder.andWhere(
-        new Brackets((qb) => {
-          qb.where('translation.title ILIKE :q', {
-            q: `%${pageOptionsDto.q}%`,
-          }).orWhere('alias.alias_title ILIKE :q', {
-            q: `%${pageOptionsDto.q}%`,
-          });
-        }),
-      );
-    }
+      return qb;
+    };
 
-    queryBuilder
+    const itemCount = await baseQuery().getCount();
+
+    const { entities } = await baseQuery()
       .orderBy('novel.createdAt', pageOptionsDto.order)
       .skip(pageOptionsDto.skip)
-      .take(pageOptionsDto.take);
-
-    const itemCount = await queryBuilder.getCount();
-    const { entities } = await queryBuilder.getRawAndEntities();
+      .take(pageOptionsDto.take)
+      .getRawAndEntities();
 
     const novelDtos = entities.map((novel) => this.mapNovelToDto(novel));
 
@@ -81,22 +86,21 @@ export class NovelsService {
     return new PageDto(novelDtos, pageMetaDto);
   }
 
-  async findNovelBySlugOrId(identifier: string): Promise<NovelDto | null> {
-    const lang = Lang.ENGLISH;
+  async findNovelBySlugOrId(identifier: string) {
     const qb = this.novelsRepository
       .createQueryBuilder('novel')
       .leftJoinAndSelect(
         'novel.translations',
         'translation',
-        'translation.language_code = :lang',
-        { lang },
+        'translation.language_code = :lang OR translation.is_default = true',
+        { lang: Lang.ENGLISH },
       )
       .leftJoinAndSelect('novel.author', 'author')
       .leftJoinAndSelect(
         'author.translations',
         'authorTrans',
-        'authorTrans.language_code = :lang',
-        { lang },
+        'authorTrans.language_code = :lang OR authorTrans.is_default = true',
+        { lang: Lang.ENGLISH },
       )
       .leftJoinAndSelect('novel.aliases', 'alias');
 
@@ -114,24 +118,21 @@ export class NovelsService {
   }
 
   async paginateNovelChapters(novelId: string, pageOptionsDto: PageOptionsDto) {
-    const lang = Lang.ENGLISH;
-    const qb = this.chaptersRepository.createQueryBuilder('chapter');
+    const baseQuery = () =>
+      this.chaptersRepository
+        .createQueryBuilder('chapter')
+        .leftJoinAndSelect('chapter.translations', 'translation')
+        .where('chapter.novel_id = :novelId', { novelId });
 
-    qb.leftJoinAndSelect(
-      'chapter.translations',
-      'translation',
-      'translation.language_code = :lang',
-      { lang },
-    ).where('chapter.novel_id = :novelId', { novelId });
+    const itemCount = await baseQuery().getCount();
 
-    qb.orderBy('chapter.volumeNumber', pageOptionsDto.order)
+    const { entities } = await baseQuery()
+      .orderBy('chapter.volumeNumber', pageOptionsDto.order)
       .addOrderBy('chapter.chapterNumber', pageOptionsDto.order)
       .addOrderBy('chapter.chapterSubNumber', pageOptionsDto.order)
       .skip(pageOptionsDto.skip)
-      .take(pageOptionsDto.take);
-
-    const itemCount = await qb.getCount();
-    const { entities } = await qb.getRawAndEntities();
+      .take(pageOptionsDto.take)
+      .getRawAndEntities();
 
     const chapterDtos = entities.map((chapter) =>
       this.mapChapterToDto(chapter, 240),
@@ -146,16 +147,10 @@ export class NovelsService {
     volumeNumber: number,
     chapterNumber: number,
     chapterSubNumber: number,
-  ): Promise<ChapterDto | null> {
-    const lang = Lang.ENGLISH;
+  ) {
     const qb = this.chaptersRepository.createQueryBuilder('chapter');
 
-    qb.leftJoinAndSelect(
-      'chapter.translations',
-      'translation',
-      'translation.language_code = :lang',
-      { lang },
-    )
+    qb.leftJoinAndSelect('chapter.translations', 'translation')
       .where('chapter.novel_id = :novelId', { novelId })
       .andWhere('chapter.volume_number = :volumeNumber', { volumeNumber })
       .andWhere('chapter.chapter_number = :chapterNumber', { chapterNumber })
@@ -264,9 +259,32 @@ export class NovelsService {
     return { status: 'queued', jobId: job.id };
   }
 
+  private pickTranslation<
+    T extends { languageCode: string; isDefault?: boolean },
+  >(translations: T[] | undefined): T | undefined {
+    if (!translations?.length) return undefined;
+    return (
+      translations.find((t) => t.languageCode === (Lang.ENGLISH as string)) ??
+      translations.find((t) => t.isDefault) ??
+      translations[0]
+    );
+  }
+
+  private pickChapterTranslation(
+    translations: ChapterTranslation[] | undefined,
+  ) {
+    if (!translations?.length) return undefined;
+    return (
+      translations.find((t) => t.languageCode === (Lang.ENGLISH as string)) ??
+      translations[0]
+    );
+  }
+
   private mapNovelToDto(novel: Novel): NovelDto {
-    const trans = novel.translations?.[0];
-    const authTrans = novel.author?.translations?.[0];
+    const trans = this.pickTranslation<NovelTranslation>(novel.translations);
+    const authTrans = this.pickTranslation<AuthorTranslation>(
+      novel.author?.translations,
+    );
 
     return {
       id: novel.id,
@@ -275,7 +293,7 @@ export class NovelsService {
       synopsis: trans?.synopsis || '',
       coverUrl: novel.coverUrl,
       status: novel.status,
-      languageCode: trans?.languageCode,
+      languageCode: trans?.languageCode ?? '',
       createdAt: novel.createdAt,
       aliases: novel.aliases?.map((a) => a.aliasTitle) || [],
       author: novel.author
@@ -293,7 +311,7 @@ export class NovelsService {
     chapter: Chapter,
     truncateLength?: number,
   ): ChapterDto {
-    const translation = chapter.translations?.[0];
+    const translation = this.pickChapterTranslation(chapter.translations);
 
     let content = translation?.content;
 
@@ -310,9 +328,9 @@ export class NovelsService {
       chapterNumber: chapter.chapterNumber,
       chapterSubNumber: chapter.chapterSubNumber,
       volumeNumber: chapter.volumeNumber,
-      languageCode: translation?.languageCode,
-      title: translation?.title,
-      content,
+      languageCode: translation?.languageCode ?? '',
+      title: translation?.title ?? null,
+      content: content ?? '',
       createdAt: chapter.createdAt,
     };
   }
