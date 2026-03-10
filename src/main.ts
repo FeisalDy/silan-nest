@@ -15,4 +15,11 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
   await app.listen(process.env.PORT ?? 3000);
 }
-bootstrap();
+bootstrap()
+  .then(() => {
+    console.log('Application is running on port 3000');
+  })
+  .catch((error) => {
+    console.error('Error starting application:', error);
+    process.exit(1);
+  });
