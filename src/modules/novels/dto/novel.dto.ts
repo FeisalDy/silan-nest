@@ -11,11 +11,11 @@ export class NovelDto {
   @ApiProperty()
   slug: string;
 
-  @ApiPropertyOptional()
-  synopsis?: string;
+  @ApiProperty()
+  synopsis: string;
 
   @ApiProperty()
-  coverUrl: string;
+  coverUrl: string | null;
 
   @ApiProperty({ example: 'completed' })
   status: string;
@@ -23,11 +23,11 @@ export class NovelDto {
   @ApiProperty()
   languageCode: string;
 
-  @ApiProperty({ type: () => AuthorDto })
-  author: AuthorDto;
+  @ApiPropertyOptional({ type: () => AuthorDto })
+  author: AuthorDto | null;
 
   @ApiPropertyOptional({ type: [String] })
-  aliases?: string[];
+  aliases: string[];
 
   @ApiProperty()
   createdAt: Date;

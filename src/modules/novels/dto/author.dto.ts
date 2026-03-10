@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class AuthorDto {
   @ApiProperty()
@@ -7,9 +7,9 @@ export class AuthorDto {
   @ApiProperty()
   name: string;
 
-  @ApiPropertyOptional()
-  photoUrl?: string;
+  @ApiProperty()
+  photoUrl: string | null;
 
-  @ApiPropertyOptional()
-  biography?: string;
+  @ApiProperty()
+  biography: string | null;
 }
