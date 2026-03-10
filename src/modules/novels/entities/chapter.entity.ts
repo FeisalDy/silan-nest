@@ -18,8 +18,11 @@ export class Chapter {
   @Column({ name: 'novel_id' })
   novelId: string;
 
-  @Column({ name: 'chapter_number', type: 'decimal', precision: 10, scale: 2 })
+  @Column({ name: 'chapter_number', type: 'integer' })
   chapterNumber: number;
+
+  @Column({ name: 'chapter_sub_number', type: 'integer', default: 0 })
+  chapterSubNumber: number;
 
   @Column({ name: 'volume_number', type: 'integer', default: 1 })
   volumeNumber: number;

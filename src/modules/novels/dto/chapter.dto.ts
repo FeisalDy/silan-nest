@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ChapterDto {
   @ApiProperty()
@@ -9,6 +9,9 @@ export class ChapterDto {
 
   @ApiProperty()
   chapterNumber: number;
+
+  @ApiProperty()
+  chapterSubNumber: number;
 
   @ApiProperty()
   volumeNumber: number;
@@ -22,6 +25,11 @@ export class ChapterDto {
   @ApiProperty()
   content: string;
 
+  @ApiPropertyOptional()
+  navigation?: {
+    prev: { chapterNumber: number; chapterSubNumber: number } | null;
+    next: { chapterNumber: number; chapterSubNumber: number } | null;
+  };
   @ApiProperty()
   createdAt: Date;
 }

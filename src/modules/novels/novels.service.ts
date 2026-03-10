@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Novel } from './entities/novel.entity';
+import { NovelParserFactory } from './parsers/novel-parser.factory';
+import {
+  NOVEL_IMPORT_JOB,
+  NOVEL_IMPORT_QUEUE,
+  NovelImportJobPayload,
+} from './queues/novel-import.queue';
 
 import { PageOptionsDto } from '../../common/dto/page-options.dto';
 import { PageMetaDto } from '../../common/dto/page-meta.dto';
@@ -20,6 +28,9 @@ export class NovelsService {
 
     @InjectRepository(Chapter)
     private chaptersRepository: Repository<Chapter>,
+
+    @InjectQueue(NOVEL_IMPORT_QUEUE)
+    private novelImportQueue: Queue<NovelImportJobPayload>,
   ) {}
 
   async paginateNovels(
@@ -113,7 +124,10 @@ export class NovelsService {
       { lang },
     ).where('chapter.novelId = :novelId', { novelId });
 
-    qb.orderBy('chapter.createdAt', pageOptionsDto.order)
+    qb.orderBy(
+      'chapter.chapter_number, chapter.chapter_sub_number ',
+      pageOptionsDto.order,
+    )
       .skip(pageOptionsDto.skip)
       .take(pageOptionsDto.take);
 
@@ -121,11 +135,112 @@ export class NovelsService {
     const { entities } = await qb.getRawAndEntities();
 
     const chapterDtos = entities.map((chapter) =>
-      this.mapChapterToDto(chapter),
+      this.mapChapterToDto(chapter, 240),
     );
 
     const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto });
     return new PageDto(chapterDtos, pageMetaDto);
+  }
+
+  async findChapterByNovelIdAndChapterNumber(
+    novelId: string,
+    chapterNumber: number,
+    chapterSubNumber: number,
+  ): Promise<ChapterDto | null> {
+    const lang = Lang.ENGLISH;
+    const qb = this.chaptersRepository.createQueryBuilder('chapter');
+
+    qb.leftJoinAndSelect(
+      'chapter.translations',
+      'translation',
+      'translation.language_code = :lang',
+      { lang },
+    )
+      .where('chapter.novel_id = :novelId', { novelId })
+      .andWhere('chapter.chapter_number = :chapterNumber', { chapterNumber })
+      .andWhere('chapter.chapter_sub_number = :chapterSubNumber', {
+        chapterSubNumber,
+      });
+
+    const chapter = await qb.getOne();
+
+    if (!chapter) return null;
+
+    const [prev, next] = await Promise.all([
+      this.findPrevChapter(novelId, chapterNumber, chapterSubNumber),
+      this.findNextChapter(novelId, chapterNumber, chapterSubNumber),
+    ]);
+
+    const dto = this.mapChapterToDto(chapter);
+
+    dto.navigation = {
+      prev: prev
+        ? {
+            chapterNumber: prev.chapterNumber,
+            chapterSubNumber: prev.chapterSubNumber,
+          }
+        : null,
+      next: next
+        ? {
+            chapterNumber: next.chapterNumber,
+            chapterSubNumber: next.chapterSubNumber,
+          }
+        : null,
+    };
+
+    return dto;
+  }
+
+  async findNextChapter(
+    novelId: string,
+    chapterNumber: number,
+    chapterSubNumber: number,
+  ) {
+    return this.chaptersRepository
+      .createQueryBuilder('chapter')
+      .where('chapter.novel_id = :novelId', { novelId })
+      .andWhere(
+        '(chapter.chapter_number, chapter.chapter_sub_number) > (:chapterNumber, :chapterSubNumber)',
+        { chapterNumber, chapterSubNumber },
+      )
+      .orderBy('chapter.chapter_number', 'ASC')
+      .addOrderBy('chapter.chapter_sub_number', 'ASC')
+      .limit(1)
+      .getOne();
+  }
+
+  async findPrevChapter(
+    novelId: string,
+    chapterNumber: number,
+    chapterSubNumber: number,
+  ) {
+    return this.chaptersRepository
+      .createQueryBuilder('chapter')
+      .where('chapter.novel_id = :novelId', { novelId })
+      .andWhere(
+        '(chapter.chapter_number, chapter.chapter_sub_number) < (:chapterNumber, :chapterSubNumber)',
+        { chapterNumber, chapterSubNumber },
+      )
+      .orderBy('chapter.chapter_number', 'DESC')
+      .addOrderBy('chapter.chapter_sub_number', 'DESC')
+      .limit(1)
+      .getOne();
+  }
+
+  async importNovelFromTxt(
+    file: Express.Multer.File,
+    source: string,
+  ): Promise<{ status: string; jobId: string | undefined }> {
+    const text = file.buffer.toString('utf-8');
+    const parser = NovelParserFactory.create(source);
+    const parsedNovel = parser.parse(text);
+
+    const job = await this.novelImportQueue.add(NOVEL_IMPORT_JOB, {
+      source,
+      parsedNovel,
+    });
+
+    return { status: 'queued', jobId: job.id };
   }
 
   private mapNovelToDto(novel: Novel): NovelDto {
@@ -153,17 +268,30 @@ export class NovelsService {
     };
   }
 
-  private mapChapterToDto(chapter: Chapter): ChapterDto {
-    const trans = chapter.translations?.[0];
+  private mapChapterToDto(
+    chapter: Chapter,
+    truncateLength?: number,
+  ): ChapterDto {
+    const translation = chapter.translations?.[0];
+
+    let content = translation?.content;
+
+    if (truncateLength && content && content.length > truncateLength) {
+      const clipped = content.slice(0, truncateLength);
+      const lastSpace = clipped.lastIndexOf(' ');
+      content =
+        clipped.slice(0, lastSpace > 0 ? lastSpace : truncateLength) + '...';
+    }
 
     return {
       id: chapter.id,
       novelId: chapter.novelId,
       chapterNumber: chapter.chapterNumber,
+      chapterSubNumber: chapter.chapterSubNumber,
       volumeNumber: chapter.volumeNumber,
-      languageCode: trans?.languageCode,
-      title: trans?.title,
-      content: trans?.content || '',
+      languageCode: translation?.languageCode,
+      title: translation?.title,
+      content,
       createdAt: chapter.createdAt,
     };
   }
