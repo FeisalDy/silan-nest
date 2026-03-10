@@ -27,8 +27,16 @@ export class ChapterDto {
 
   @ApiPropertyOptional()
   navigation?: {
-    prev: { chapterNumber: number; chapterSubNumber: number } | null;
-    next: { chapterNumber: number; chapterSubNumber: number } | null;
+    prev: {
+      volumeNumber: number;
+      chapterNumber: number;
+      chapterSubNumber: number;
+    } | null;
+    next: {
+      volumeNumber: number;
+      chapterNumber: number;
+      chapterSubNumber: number;
+    } | null;
   };
   @ApiProperty()
   createdAt: Date;

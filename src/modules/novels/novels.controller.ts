@@ -79,7 +79,7 @@ export class NovelsController {
     return this.novelsService.importNovelFromTxt(file, source);
   }
 
-  @Get(':indentifier')
+  @Get(':identifier')
   async findOne(@Param('identifier') identifier: string) {
     const novel = await this.novelsService.findNovelBySlugOrId(identifier);
 
@@ -98,34 +98,42 @@ export class NovelsController {
     return this.novelsService.paginateNovelChapters(novelId, pageOptionsDto);
   }
 
-  @Get(':novelId/chapters/:chapterNumber')
+  @Get(':novelId/chapters/:volumeNumber/:chapterNumber')
   async getMainChapter(
     @Param('novelId') novelId: string,
+    @Param('volumeNumber', ParseIntPipe) volumeNumber: number,
     @Param('chapterNumber', ParseIntPipe) chapterNumber: number,
   ) {
-    return this.getChapter(novelId, chapterNumber, 0);
+    return this.getChapter(novelId, volumeNumber, chapterNumber, 0);
   }
 
-  @Get(':novelId/chapters/:chapterNumber/:chapterSubNumber')
+  @Get(':novelId/chapters/:volumeNumber/:chapterNumber/:chapterSubNumber')
   async getSubChapter(
     @Param('novelId') novelId: string,
+    @Param('volumeNumber', ParseIntPipe) volumeNumber: number,
     @Param('chapterNumber', ParseIntPipe) chapterNumber: number,
     @Param('chapterSubNumber', ParseIntPipe) chapterSubNumber: number,
   ) {
-    return this.getChapter(novelId, chapterNumber, chapterSubNumber);
+    return this.getChapter(
+      novelId,
+      volumeNumber,
+      chapterNumber,
+      chapterSubNumber,
+    );
   }
 
   private async getChapter(
     novelId: string,
+    volumeNumber: number,
     chapterNumber: number,
     chapterSubNumber: number,
   ) {
-    const chapter =
-      await this.novelsService.findChapterByNovelIdAndChapterNumber(
-        novelId,
-        chapterNumber,
-        chapterSubNumber,
-      );
+    const chapter = await this.novelsService.findChapter(
+      novelId,
+      volumeNumber,
+      chapterNumber,
+      chapterSubNumber,
+    );
 
     if (!chapter) {
       throw new NotFoundException('Chapter not found');

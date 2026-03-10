@@ -12,7 +12,8 @@ import {
   NOVEL_IMPORT_QUEUE,
   NovelImportJobPayload,
 } from './novel-import.queue';
-import { Lang } from '../../../common/constants/lang.constant';
+import { Author } from '../entities/author.entity';
+import { AuthorTranslation } from '../entities/author-translation.entity';
 
 @Processor(NOVEL_IMPORT_QUEUE)
 export class NovelImportProcessor extends WorkerHost {
@@ -30,6 +31,12 @@ export class NovelImportProcessor extends WorkerHost {
 
     @InjectRepository(ChapterTranslation)
     private readonly chapterTranslationsRepository: Repository<ChapterTranslation>,
+
+    @InjectRepository(Author)
+    private readonly authorsRepository: Repository<Author>,
+
+    @InjectRepository(AuthorTranslation)
+    private readonly authorTranslationsRepository: Repository<AuthorTranslation>,
   ) {
     super();
   }
@@ -40,7 +47,7 @@ export class NovelImportProcessor extends WorkerHost {
     const { parsedNovel } = job.data;
     this.logger.log(`Processing import job #${job.id}: "${parsedNovel.title}"`);
 
-    const novel = this.novelsRepository.create({ status: 'ongoing' });
+    const novel = this.novelsRepository.create({ status: parsedNovel.status });
     const savedNovel = await this.novelsRepository.save(novel);
 
     const slug = this.buildSlug(parsedNovel.title);
@@ -48,9 +55,9 @@ export class NovelImportProcessor extends WorkerHost {
     await this.novelTranslationsRepository.save(
       this.novelTranslationsRepository.create({
         novelId: savedNovel.id,
-        languageCode: Lang.ENGLISH,
+        languageCode: parsedNovel.languageCode,
         title: parsedNovel.title,
-        synopsis: parsedNovel.synopsis || null,
+        synopsis: parsedNovel.synopsis,
         slug,
         isDefault: true,
       }),
@@ -62,13 +69,14 @@ export class NovelImportProcessor extends WorkerHost {
           novelId: savedNovel.id,
           chapterNumber: parsedChapter.chapterNumber,
           chapterSubNumber: parsedChapter.chapterSubNumber,
+          volumeNumber: parsedChapter.volumeNumber,
         }),
       );
 
       await this.chapterTranslationsRepository.save(
         this.chapterTranslationsRepository.create({
           chapterId: chapter.id,
-          languageCode: Lang.ENGLISH,
+          languageCode: parsedNovel.languageCode,
           title: parsedChapter.title || null,
           content: parsedChapter.content,
         }),

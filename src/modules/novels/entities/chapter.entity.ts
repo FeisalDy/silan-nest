@@ -6,11 +6,13 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
 import { Novel } from './novel.entity.js';
 import { ChapterTranslation } from './chapter-translation.entity.js';
 
 @Entity('chapters')
+@Unique(['novelId', 'volumeNumber', 'chapterNumber', 'chapterSubNumber'])
 export class Chapter {
   @PrimaryGeneratedColumn('uuid')
   id: string;

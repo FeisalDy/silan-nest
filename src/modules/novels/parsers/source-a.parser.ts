@@ -80,6 +80,7 @@ import {
   ParsedChapter,
   ParsedNovel,
 } from '../interfaces/parsed-novel.interface';
+import { Lang } from '../../../common/constants/lang.constant';
 
 /**
  * SourceA format example:
@@ -100,25 +101,26 @@ import {
 export class SourceAParser implements NovelParser {
   private static readonly TITLE_RE = /^书籍名称：(.+)$/m;
   private static readonly AUTHOR_RE = /^作者名称：(.+)$/m;
+  private static readonly STATUS_RE = /^是否完结：(.+)$/m;
 
-  /**
-   * Matches:
-   * 第1章 标题
-   * 第12章 标题
-   */
   private static readonly CHAPTER_HEADING_RE = /^第\s*(\d+)\s*章\s*(.+)$/m;
 
   parse(text: string): ParsedNovel {
     const title = SourceAParser.TITLE_RE.exec(text)?.[1]?.trim() ?? '';
-    const author = SourceAParser.AUTHOR_RE.exec(text)?.[1]?.trim() ?? '';
+    const author = SourceAParser.AUTHOR_RE.exec(text)?.[1]?.trim() ?? null;
+    const status = this.mapStatus(
+      SourceAParser.STATUS_RE.exec(text)?.[1]?.trim() ?? null,
+    );
 
     const chapters = this.extractChapters(text);
 
     return {
       title,
       author,
-      synopsis: '',
+      status,
+      synopsis: null,
       chapters,
+      languageCode: Lang.CHINESE_PRC,
     };
   }
 
@@ -130,11 +132,24 @@ export class SourceAParser implements NovelParser {
     let lastIndex = 0;
     let lastMatch: RegExpExecArray | null = null;
 
+    let currentVolume = 1;
+    let previousChapterNumber = 0;
+
     while ((match = headingRe.exec(text)) !== null) {
+      const chapterNumber = parseInt(match[1], 10);
+
       if (lastMatch) {
         const content = text.slice(lastIndex, match.index).trim();
-        chapters.push(this.buildChapter(lastMatch, content));
+
+        chapters.push(this.buildChapter(lastMatch, content, currentVolume));
       }
+
+      // detect new volume
+      if (chapterNumber <= previousChapterNumber) {
+        currentVolume++;
+      }
+
+      previousChapterNumber = chapterNumber;
 
       lastMatch = match;
       lastIndex = headingRe.lastIndex;
@@ -142,18 +157,32 @@ export class SourceAParser implements NovelParser {
 
     if (lastMatch) {
       const content = text.slice(lastIndex).trim();
-      chapters.push(this.buildChapter(lastMatch, content));
+      chapters.push(this.buildChapter(lastMatch, content, currentVolume));
     }
 
     return chapters;
   }
 
-  private buildChapter(match: RegExpExecArray, content: string): ParsedChapter {
+  private buildChapter(
+    match: RegExpExecArray,
+    content: string,
+    volumeNumber: number,
+  ): ParsedChapter {
     return {
       chapterNumber: parseInt(match[1], 10),
       chapterSubNumber: 0,
+      volumeNumber,
       title: match[2]?.trim() ?? '',
       content,
     };
+  }
+
+  private mapStatus(status: string | null): string {
+    if (!status) return 'unknown';
+
+    if (status.includes('未完')) return 'ongoing';
+    if (status.includes('完结')) return 'completed';
+
+    return 'unknown';
   }
 }

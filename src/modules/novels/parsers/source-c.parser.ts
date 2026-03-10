@@ -3,6 +3,7 @@ import {
   ParsedChapter,
   ParsedNovel,
 } from '../interfaces/parsed-novel.interface';
+import { Lang } from '../../../common/constants/lang.constant';
 
 /**
  * SourceC — multi-pattern auto-detect parser.
@@ -122,8 +123,15 @@ export class SourceCParser implements NovelParser {
     const synopsis = '';
 
     const chapters = this.extractChapters(text);
-
-    return { title, author, synopsis, chapters };
+    const status = '';
+    return {
+      title,
+      author,
+      synopsis,
+      chapters,
+      status,
+      languageCode: Lang.CHINESE_PRC,
+    };
   }
 
   private extractChapters(text: string): ParsedChapter[] {
@@ -139,6 +147,7 @@ export class SourceCParser implements NovelParser {
         chapterNumber: idx + 1,
         chapterSubNumber: 0,
         title: firstLine,
+        volumeNumber: 1,
         content,
       };
     });

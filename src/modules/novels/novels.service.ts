@@ -100,10 +100,10 @@ export class NovelsService {
       )
       .leftJoinAndSelect('novel.aliases', 'alias');
 
-    qb.where('translation.slug = :identifier', { identifier });
+    qb.where('translation.slug = :slug', { slug: identifier });
 
     if (isUUID(identifier)) {
-      qb.orWhere('novel.id = :identifier', { identifier });
+      qb.orWhere('novel.id = :id', { id: identifier });
     }
 
     const novel = await qb.getOne();
@@ -122,12 +122,11 @@ export class NovelsService {
       'translation',
       'translation.language_code = :lang',
       { lang },
-    ).where('chapter.novelId = :novelId', { novelId });
+    ).where('chapter.novel_id = :novelId', { novelId });
 
-    qb.orderBy(
-      'chapter.chapter_number, chapter.chapter_sub_number ',
-      pageOptionsDto.order,
-    )
+    qb.orderBy('chapter.volumeNumber', pageOptionsDto.order)
+      .addOrderBy('chapter.chapterNumber', pageOptionsDto.order)
+      .addOrderBy('chapter.chapterSubNumber', pageOptionsDto.order)
       .skip(pageOptionsDto.skip)
       .take(pageOptionsDto.take);
 
@@ -142,8 +141,9 @@ export class NovelsService {
     return new PageDto(chapterDtos, pageMetaDto);
   }
 
-  async findChapterByNovelIdAndChapterNumber(
+  async findChapter(
     novelId: string,
+    volumeNumber: number,
     chapterNumber: number,
     chapterSubNumber: number,
   ): Promise<ChapterDto | null> {
@@ -157,6 +157,7 @@ export class NovelsService {
       { lang },
     )
       .where('chapter.novel_id = :novelId', { novelId })
+      .andWhere('chapter.volume_number = :volumeNumber', { volumeNumber })
       .andWhere('chapter.chapter_number = :chapterNumber', { chapterNumber })
       .andWhere('chapter.chapter_sub_number = :chapterSubNumber', {
         chapterSubNumber,
@@ -167,8 +168,18 @@ export class NovelsService {
     if (!chapter) return null;
 
     const [prev, next] = await Promise.all([
-      this.findPrevChapter(novelId, chapterNumber, chapterSubNumber),
-      this.findNextChapter(novelId, chapterNumber, chapterSubNumber),
+      this.findPrevChapter(
+        novelId,
+        chapter.volumeNumber,
+        chapterNumber,
+        chapterSubNumber,
+      ),
+      this.findNextChapter(
+        novelId,
+        chapter.volumeNumber,
+        chapterNumber,
+        chapterSubNumber,
+      ),
     ]);
 
     const dto = this.mapChapterToDto(chapter);
@@ -176,12 +187,14 @@ export class NovelsService {
     dto.navigation = {
       prev: prev
         ? {
+            volumeNumber: prev.volumeNumber,
             chapterNumber: prev.chapterNumber,
             chapterSubNumber: prev.chapterSubNumber,
           }
         : null,
       next: next
         ? {
+            volumeNumber: next.volumeNumber,
             chapterNumber: next.chapterNumber,
             chapterSubNumber: next.chapterSubNumber,
           }
@@ -193,6 +206,7 @@ export class NovelsService {
 
   async findNextChapter(
     novelId: string,
+    volumeNumber: number,
     chapterNumber: number,
     chapterSubNumber: number,
   ) {
@@ -200,10 +214,11 @@ export class NovelsService {
       .createQueryBuilder('chapter')
       .where('chapter.novel_id = :novelId', { novelId })
       .andWhere(
-        '(chapter.chapter_number, chapter.chapter_sub_number) > (:chapterNumber, :chapterSubNumber)',
-        { chapterNumber, chapterSubNumber },
+        '(chapter.volume_number, chapter.chapter_number, chapter.chapter_sub_number) > (:volumeNumber, :chapterNumber, :chapterSubNumber)',
+        { volumeNumber, chapterNumber, chapterSubNumber },
       )
-      .orderBy('chapter.chapter_number', 'ASC')
+      .orderBy('chapter.volume_number', 'ASC')
+      .addOrderBy('chapter.chapter_number', 'ASC')
       .addOrderBy('chapter.chapter_sub_number', 'ASC')
       .limit(1)
       .getOne();
@@ -211,6 +226,7 @@ export class NovelsService {
 
   async findPrevChapter(
     novelId: string,
+    volumeNumber: number,
     chapterNumber: number,
     chapterSubNumber: number,
   ) {
@@ -218,10 +234,11 @@ export class NovelsService {
       .createQueryBuilder('chapter')
       .where('chapter.novel_id = :novelId', { novelId })
       .andWhere(
-        '(chapter.chapter_number, chapter.chapter_sub_number) < (:chapterNumber, :chapterSubNumber)',
-        { chapterNumber, chapterSubNumber },
+        '(chapter.volume_number, chapter.chapter_number, chapter.chapter_sub_number) < (:volumeNumber, :chapterNumber, :chapterSubNumber)',
+        { volumeNumber, chapterNumber, chapterSubNumber },
       )
-      .orderBy('chapter.chapter_number', 'DESC')
+      .orderBy('chapter.volume_number', 'DESC')
+      .addOrderBy('chapter.chapter_number', 'DESC')
       .addOrderBy('chapter.chapter_sub_number', 'DESC')
       .limit(1)
       .getOne();

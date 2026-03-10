@@ -3,6 +3,7 @@ import {
   ParsedChapter,
   ParsedNovel,
 } from '../interfaces/parsed-novel.interface';
+import { Lang } from '../../../common/constants/lang.constant';
 
 /**
  * SourceB format:
@@ -38,8 +39,16 @@ export class SourceBParser implements NovelParser {
     const author = SourceBParser.AUTHOR_RE.exec(text)?.[1]?.trim() ?? '';
     const synopsis = this.extractSynopsis(text);
     const chapters = this.extractChapters(text);
+    const status = '';
 
-    return { title, author, synopsis, chapters };
+    return {
+      title,
+      author,
+      synopsis,
+      chapters,
+      status,
+      languageCode: Lang.CHINESE_PRC,
+    };
   }
 
   private extractSynopsis(text: string): string {
@@ -88,6 +97,7 @@ export class SourceBParser implements NovelParser {
       chapterNumber: parseInt(match[1], 10),
       chapterSubNumber: match[2] ? parseInt(match[2], 10) : 0,
       title: match[3]?.trim() ?? '',
+      volumeNumber: 1,
       content,
     };
   }
