@@ -2,12 +2,14 @@ import { BadRequestException } from '@nestjs/common';
 import { NovelParser } from '../interfaces/parsed-novel.interface';
 import { SourceAParser } from './source-a.parser';
 import { SourceBParser } from './source-b.parser';
+import { SourceCParser } from './source-c.parser';
 
-export type NovelSource = 'source-a' | 'source-b';
+export type NovelSource = 'source-a' | 'source-b' | 'source-c';
 
 const PARSER_MAP: Record<NovelSource, new () => NovelParser> = {
   'source-a': SourceAParser,
   'source-b': SourceBParser,
+  'source-c': SourceCParser,
 };
 
 export class NovelParserFactory {

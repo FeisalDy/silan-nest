@@ -227,13 +227,17 @@ export class NovelsService {
       .getOne();
   }
 
+  previewNovelFromTxt(file: Express.Multer.File, source: string) {
+    const text = file.buffer.toString('utf-8');
+    const parser = NovelParserFactory.create(source);
+    return parser.parse(text);
+  }
+
   async importNovelFromTxt(
     file: Express.Multer.File,
     source: string,
   ): Promise<{ status: string; jobId: string | undefined }> {
-    const text = file.buffer.toString('utf-8');
-    const parser = NovelParserFactory.create(source);
-    const parsedNovel = parser.parse(text);
+    const parsedNovel = this.previewNovelFromTxt(file, source);
 
     const job = await this.novelImportQueue.add(NOVEL_IMPORT_JOB, {
       source,
