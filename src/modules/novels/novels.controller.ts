@@ -79,6 +79,11 @@ export class NovelsController {
     return this.novelsService.importNovelFromTxt(file, source);
   }
 
+  @Get('import/:jobId/status')
+  getImportJobStatus(@Param('jobId') jobId: string) {
+    return this.novelsService.getImportJobStatus(jobId);
+  }
+
   @Get(':identifier')
   async findOne(@Param('identifier') identifier: string) {
     const novel = await this.novelsService.findNovelBySlugOrId(identifier);
@@ -88,6 +93,34 @@ export class NovelsController {
     }
 
     return novel;
+  }
+
+  @Post(':novelId/translate')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['targetLang'],
+      properties: {
+        targetLang: {
+          type: 'string',
+          description: 'Target language code (e.g. en, id, ja)',
+        },
+      },
+    },
+  })
+  translateNovel(
+    @Param('novelId') novelId: string,
+    @Body() body: { targetLang: string },
+  ) {
+    return this.novelsService.queueTranslation({
+      novelId,
+      targetLang: body.targetLang,
+    });
+  }
+
+  @Get(':novelId/translate/status')
+  getTranslateStatus(@Param('novelId') novelId: string) {
+    return this.novelsService.getTranslationJobStatus(novelId);
   }
 
   @Get(':novelId/chapters')

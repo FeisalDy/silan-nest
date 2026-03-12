@@ -7,10 +7,10 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Author } from './author.entity.js';
-import { NovelTranslation } from './novel-translation.entity.js';
-import { NovelAlias } from './novel-alias.entity.js';
-import { Chapter } from './chapter.entity.js';
+import { Author } from './author.entity';
+import { NovelTranslation } from './novel-translation.entity';
+import { NovelAlias } from './novel-alias.entity';
+import { Chapter } from './chapter.entity';
 
 @Entity('novels')
 export class Novel {

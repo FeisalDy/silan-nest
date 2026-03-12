@@ -8,8 +8,8 @@ import {
   PrimaryGeneratedColumn,
   Unique,
 } from 'typeorm';
-import { Novel } from './novel.entity.js';
-import { ChapterTranslation } from './chapter-translation.entity.js';
+import { Novel } from './novel.entity';
+import { ChapterTranslation } from './chapter-translation.entity';
 
 @Entity('chapters')
 @Unique(['novelId', 'volumeNumber', 'chapterNumber', 'chapterSubNumber'])

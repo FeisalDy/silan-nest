@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
   Unique,
 } from 'typeorm';
-import { Novel } from './novel.entity.js';
+import { Novel } from './novel.entity';
 
 @Entity('novel_translations')
 @Unique(['novelId', 'languageCode'])

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AuthorDto } from './author.dto.js';
+import { AuthorDto } from './author.dto';
 
 export class NovelDto {
   @ApiProperty()

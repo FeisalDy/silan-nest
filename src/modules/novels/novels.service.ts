@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -22,6 +26,11 @@ import { ChapterDto } from './dto/chapter.dto';
 import { NovelTranslation } from './entities/novel-translation.entity';
 import { AuthorTranslation } from './entities/author-translation.entity';
 import { ChapterTranslation } from './entities/chapter-translation.entity';
+import {
+  NOVEL_TRANSLATION_JOB,
+  NOVEL_TRANSLATION_QUEUE,
+  NovelTranslationJobPayload,
+} from './queues/novel-translation.queue';
 
 @Injectable()
 export class NovelsService {
@@ -34,6 +43,9 @@ export class NovelsService {
 
     @InjectQueue(NOVEL_IMPORT_QUEUE)
     private novelImportQueue: Queue<NovelImportJobPayload>,
+
+    @InjectQueue(NOVEL_TRANSLATION_QUEUE)
+    private novelTranslationQueue: Queue<NovelTranslationJobPayload>,
   ) {}
 
   async paginateNovels(pageOptionsDto: PageOptionsDto) {
@@ -259,6 +271,80 @@ export class NovelsService {
     return { status: 'queued', jobId: job.id };
   }
 
+  async getImportJobStatus(jobId: string): Promise<{
+    jobId: string;
+    status: string;
+    failedReason?: string;
+  }> {
+    const job = await this.novelImportQueue.getJob(jobId);
+
+    if (!job) {
+      return { jobId, status: 'Job not Found' };
+    }
+
+    const state = await job.getState();
+    const result: { jobId: string; status: string; failedReason?: string } = {
+      jobId,
+      status: state,
+    };
+
+    if (state === 'failed') {
+      result.failedReason = job.failedReason ?? 'Unknown error';
+    }
+
+    return result;
+  }
+
+  async queueTranslation(payload: NovelTranslationJobPayload) {
+    const novel = await this.novelsRepository.findOneBy({
+      id: payload.novelId,
+    });
+
+    if (!novel) {
+      throw new NotFoundException('Novel not found');
+    }
+
+    const jobId = `translate-${payload.novelId}`;
+    const existingJob = await this.novelTranslationQueue.getJob(jobId);
+    if (existingJob) {
+      const state = await existingJob.getState();
+
+      if (state === 'waiting' || state === 'active') {
+        throw new BadRequestException('Translation already in progress');
+      }
+
+      await existingJob.remove();
+    }
+    const job = await this.novelTranslationQueue.add(
+      NOVEL_TRANSLATION_JOB,
+      payload,
+      { jobId },
+    );
+
+    return {
+      status: 'queued',
+      jobId: job.id,
+    };
+  }
+
+  async getTranslationJobStatus(novelId: string) {
+    const jobId = `translate-${novelId}`;
+    const job = await this.novelTranslationQueue.getJob(jobId);
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+    const state = await job.getState();
+    const result: { jobId: string; status: string; failedReason?: string } = {
+      jobId,
+      status: state,
+    };
+
+    if (state === 'failed') {
+      result.failedReason = job.failedReason ?? 'Unknown error';
+    }
+
+    return result;
+  }
   private pickTranslation<
     T extends { languageCode: string; isDefault?: boolean },
   >(translations: T[] | undefined): T | undefined {

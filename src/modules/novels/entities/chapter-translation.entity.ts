@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
   Unique,
 } from 'typeorm';
-import { Chapter } from './chapter.entity.js';
+import { Chapter } from './chapter.entity';
 
 @Entity('chapter_translations')
 @Unique(['chapterId', 'languageCode'])
