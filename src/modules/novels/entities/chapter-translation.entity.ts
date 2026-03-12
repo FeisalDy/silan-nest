@@ -26,6 +26,9 @@ export class ChapterTranslation {
   @Column({ type: 'text' })
   content: string;
 
+  @Column({ name: 'is_default', type: 'boolean', default: false })
+  isDefault: boolean;
+
   @ManyToOne(() => Chapter, (chapter: Chapter) => chapter.translations, {
     onDelete: 'CASCADE',
   })

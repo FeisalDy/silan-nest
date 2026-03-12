@@ -78,6 +78,7 @@ export class NovelImportProcessor extends WorkerHost {
             languageCode: parsedNovel.languageCode,
             title: parsedChapter.title || null,
             content: parsedChapter.content,
+            isDefault: true,
           }),
         );
       }
