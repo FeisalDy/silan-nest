@@ -12,7 +12,7 @@ import { AuthService } from './auth.service';
     TypeOrmModule.forFeature([Role, Session, PasswordResetToken]),
     UsersModule,
   ],
-  exports: [TypeOrmModule],
+  exports: [TypeOrmModule, AuthService],
   controllers: [AuthController],
   providers: [AuthService],
 })

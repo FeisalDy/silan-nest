@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { Role } from '../auth/entities/role.entity';
+import { Role as RoleEnum } from '../../common/constants/role.constant';
 import * as bcrypt from 'bcrypt';
 @Injectable()
 export class UsersService {
@@ -48,7 +49,9 @@ export class UsersService {
         'User with this email or username already exists',
       );
     }
-    const readerRole = await this.roleRepository.findOneBy({ name: 'reader' });
+    const readerRole = await this.roleRepository.findOneBy({
+      name: RoleEnum.READER,
+    });
     if (!readerRole) {
       throw new InternalServerErrorException('Role "reader" not initialized');
     }

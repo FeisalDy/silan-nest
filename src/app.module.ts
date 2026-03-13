@@ -5,6 +5,9 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { NovelsModule } from './modules/novels/novels.module';
+import { APP_GUARD } from '@nestjs/core';
+import { SessionGuard } from './modules/auth/guards/session.guard';
+import { RolesGuard } from './modules/auth/guards/roles.guard';
 
 @Module({
   imports: [
@@ -27,5 +30,15 @@ import { NovelsModule } from './modules/novels/novels.module';
     NovelsModule,
   ],
   controllers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: SessionGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
 })
 export class AppModule {}

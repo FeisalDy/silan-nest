@@ -6,6 +6,7 @@ import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
+import { AuthUser } from '../users/interfaces/auth-user.interface';
 @Injectable()
 export class AuthService {
   constructor(
@@ -50,7 +51,7 @@ export class AuthService {
     }
     return null;
   }
-  async validateSession(plainToken: string) {
+  async validateSession(plainToken: string): Promise<AuthUser> {
     const tokenHash = crypto
       .createHash('sha256')
       .update(plainToken)
@@ -66,7 +67,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired session');
     }
 
-    return session.user;
+    return {
+      id: session.user.id,
+      email: session.user.email,
+      role: session.user.role.name,
+    };
   }
 
   async logout(plainToken: string) {

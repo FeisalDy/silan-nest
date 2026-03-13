@@ -6,14 +6,14 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity.js';
-
+import { Role as RoleEnum } from '../../../common/constants/role.constant';
 @Entity('roles')
 export class Role {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ type: 'varchar', length: 50, unique: true })
-  name: string;
+  name: RoleEnum;
 
   @Column({ type: 'text', nullable: true })
   description: string | null;
