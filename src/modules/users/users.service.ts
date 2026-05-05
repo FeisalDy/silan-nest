@@ -29,7 +29,10 @@ export class UsersService {
   }
 
   findOneByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOneBy({ email });
+    return this.usersRepository.findOne({
+      where: { email },
+      relations: ['role'],
+    });
   }
 
   async create(createUserDto: CreateUserDto) {

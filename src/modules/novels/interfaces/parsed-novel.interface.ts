@@ -16,5 +16,5 @@ export interface ParsedNovel {
 }
 
 export interface NovelParser {
-  parse(text: string): ParsedNovel;
+  parse(text: string, chapterLimit?: number): ParsedNovel;
 }

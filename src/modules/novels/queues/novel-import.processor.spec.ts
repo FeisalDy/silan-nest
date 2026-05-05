@@ -25,7 +25,11 @@ describe('NovelImportProcessor', () => {
   const mockEntityManager = {
     transaction: jest.fn(),
     create: jest.fn().mockImplementation((entity, dto) => dto),
-    save: jest.fn().mockImplementation((entity) => Promise.resolve({ id: 'uuid', ...entity })),
+    save: jest
+      .fn()
+      .mockImplementation((entity) =>
+        Promise.resolve({ id: 'uuid', ...entity }),
+      ),
     getRepository: jest.fn().mockImplementation((entity) => {
       if (entity === AuthorTranslation) {
         return mockAuthorTranslationsRepository;
@@ -129,7 +133,7 @@ describe('NovelImportProcessor', () => {
         expect.objectContaining({
           status: 'ongoing',
           // authorId should be 'uuid' from the mocked save of Author
-          authorId: 'uuid', 
+          authorId: 'uuid',
         }),
       );
 
@@ -182,13 +186,13 @@ describe('NovelImportProcessor', () => {
           authorId: 'existing-author-id',
         }),
       );
-      
+
       // Should NOT save new author translation (so we check specific calls)
       // Since we just check toHaveBeenCalledWith for AuthorTranslation and it shouldn't be called
       // But mockEntityManager.save is called multiple times.
       // We can check that save was NOT called with AuthorTranslation structure?
       // Or cleaner: check number of calls or inspect calls.
-      
+
       // Easier: Check that the mocked create for Author was not called?
       // But create is just creating object.
       // Let's rely on checking that save was called with the novel linked to existing-author-id.

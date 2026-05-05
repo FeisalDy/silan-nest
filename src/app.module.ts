@@ -8,6 +8,8 @@ import { NovelsModule } from './modules/novels/novels.module';
 import { APP_GUARD } from '@nestjs/core';
 import { SessionGuard } from './modules/auth/guards/session.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -23,6 +25,13 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
           password: config.get<string>('REDIS_PASSWORD'),
         },
       }),
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+      serveStaticOptions: {
+        index: false,
+      },
     }),
     DatabaseModule,
     AuthModule,

@@ -1,7 +1,5 @@
 import {
-  NovelParser,
-  ParsedChapter,
-  ParsedNovel,
+  NovelParser, ParsedChapter, ParsedNovel,
 } from '../interfaces/parsed-novel.interface';
 import { Lang } from '../../../common/constants/lang.constant';
 
@@ -31,23 +29,17 @@ export class SourceBParser implements NovelParser {
    *   第001章第02节 Title
    * Groups: (chapterNumber)(chapterSubNumber?)(title)
    */
-  private static readonly CHAPTER_HEADING_RE =
-    /^第(\d+)章(?:第(\d+)节)?\s*(.*)$/m;
+  private static readonly CHAPTER_HEADING_RE = /^第(\d+)章(?:第(\d+)节)?\s*(.*)$/m;
 
-  parse(text: string): ParsedNovel {
+  parse(text: string, chapterLimit?: number): ParsedNovel {
     const title = SourceBParser.TITLE_RE.exec(text)?.[1]?.trim() ?? '';
     const author = SourceBParser.AUTHOR_RE.exec(text)?.[1]?.trim() ?? '';
     const synopsis = this.extractSynopsis(text);
-    const chapters = this.extractChapters(text);
+    const chapters = this.extractChapters(text, chapterLimit);
     const status = '';
 
     return {
-      title,
-      author,
-      synopsis,
-      chapters,
-      status,
-      languageCode: Lang.CHINESE_PRC,
+      title, author, synopsis, chapters, status, languageCode: Lang.CHINESE_PRC,
     };
   }
 
@@ -55,19 +47,15 @@ export class SourceBParser implements NovelParser {
     const startMatch = SourceBParser.SYNOPSIS_START_RE.exec(text);
     if (!startMatch) return '';
 
-    const afterSynopsisStart = text.slice(
-      startMatch.index + startMatch[0].length,
-    );
+    const afterSynopsisStart = text.slice(startMatch.index + startMatch[0].length);
     const headingRe = new RegExp(SourceBParser.CHAPTER_HEADING_RE.source, 'm');
     const nextSection = headingRe.exec(afterSynopsisStart);
-    const raw = nextSection
-      ? afterSynopsisStart.slice(0, nextSection.index)
-      : afterSynopsisStart;
+    const raw = nextSection ? afterSynopsisStart.slice(0, nextSection.index) : afterSynopsisStart;
 
     return raw.trim();
   }
 
-  private extractChapters(text: string): ParsedChapter[] {
+  private extractChapters(text: string, chapterLimit?: number): ParsedChapter[] {
     const chapters: ParsedChapter[] = [];
     const headingRe = new RegExp(SourceBParser.CHAPTER_HEADING_RE.source, 'gm');
 
@@ -79,12 +67,16 @@ export class SourceBParser implements NovelParser {
       if (lastMatch) {
         const content = text.slice(lastIndex, match.index).trim();
         chapters.push(this.buildChapter(lastMatch, content));
+
+        if (chapterLimit && chapters.length >= chapterLimit) {
+          return chapters;
+        }
       }
       lastMatch = match;
       lastIndex = headingRe.lastIndex;
     }
 
-    if (lastMatch) {
+    if (lastMatch && (!chapterLimit || chapters.length < chapterLimit)) {
       const content = text.slice(lastIndex).trim();
       chapters.push(this.buildChapter(lastMatch, content));
     }
@@ -94,11 +86,8 @@ export class SourceBParser implements NovelParser {
 
   private buildChapter(match: RegExpExecArray, content: string): ParsedChapter {
     return {
-      chapterNumber: parseInt(match[1], 10),
-      chapterSubNumber: match[2] ? parseInt(match[2], 10) : 0,
-      title: match[3]?.trim() ?? '',
-      volumeNumber: 1,
-      content,
+      chapterNumber: parseInt(match[1], 10), chapterSubNumber: match[2] ? parseInt(match[2],
+        10) : 0, title: match[3]?.trim() ?? '', volumeNumber: 1, content,
     };
   }
 }

@@ -34,4 +34,3 @@ export class PageMetaDto {
     this.hasNextPage = this.page < this.pageCount;
   }
 }
-

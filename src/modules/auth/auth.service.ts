@@ -36,9 +36,16 @@ export class AuthService {
 
     await this.sessionRepo.save(session);
 
+    console.log(user);
+
     return {
       accessToken: plainToken,
-      user: { id: user.id, username: user.username, email: user.email },
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role.name,
+      },
     };
   }
   async validateUser(email: string, pass: string): Promise<User | null> {
@@ -63,6 +70,7 @@ export class AuthService {
     });
 
     if (!session || session.expiresAt < new Date()) {
+      // TODO: Let expired sessions naturally fail or Run a background job / cron cleanup instead
       if (session) await this.sessionRepo.remove(session); // Cleanup expired
       throw new UnauthorizedException('Invalid or expired session');
     }

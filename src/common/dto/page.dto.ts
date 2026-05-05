@@ -15,4 +15,3 @@ export class PageDto<T> {
     this.meta = meta;
   }
 }
-

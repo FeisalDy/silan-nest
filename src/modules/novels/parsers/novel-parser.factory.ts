@@ -7,9 +7,7 @@ import { SourceCParser } from './source-c.parser';
 export type NovelSource = 'source-a' | 'source-b' | 'source-c';
 
 const PARSER_MAP: Record<NovelSource, new () => NovelParser> = {
-  'source-a': SourceAParser,
-  'source-b': SourceBParser,
-  'source-c': SourceCParser,
+  'source-a': SourceAParser, 'source-b': SourceBParser, 'source-c': SourceCParser,
 };
 
 export class NovelParserFactory {
@@ -18,14 +16,13 @@ export class NovelParserFactory {
    * Throws BadRequestException for unsupported sources so NestJS
    * surfaces a clean 400 response to the caller.
    */
-  static create(source: string): NovelParser {
-    const ParserClass = PARSER_MAP[source as NovelSource];
 
-    if (!ParserClass) {
-      throw new BadRequestException(
-        `Unsupported import source: "${source}". Supported sources: ${Object.keys(PARSER_MAP).join(', ')}.`,
-      );
+  static create(source: string): NovelParser {
+    if (!(source in PARSER_MAP)) {
+      throw new BadRequestException(`Unsupported import source: "${source}". Supported sources: ${Object.keys(PARSER_MAP).join(
+        ', ')}.`);
     }
+    const ParserClass = PARSER_MAP[source as NovelSource];
 
     return new ParserClass();
   }
@@ -33,4 +30,5 @@ export class NovelParserFactory {
   static supportedSources(): NovelSource[] {
     return Object.keys(PARSER_MAP) as NovelSource[];
   }
+
 }
