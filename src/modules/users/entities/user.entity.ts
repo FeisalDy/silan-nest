@@ -8,9 +8,9 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Role } from '../../auth/entities/role.entity.js';
-import { Session } from '../../auth/entities/session.entity.js';
-import { PasswordResetToken } from '../../auth/entities/password-reset-token.entity.js';
+import { Role } from '../../auth/entities/role.entity';
+import { Session } from '../../auth/entities/session.entity';
+import { PasswordResetToken } from '../../auth/entities/password-reset-token.entity';
 
 @Entity('users')
 export class User {
@@ -41,7 +41,10 @@ export class User {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToOne(() => Role, (role: Role) => role.users, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => Role, (role: Role) => role.users, {
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE',
+  })
   @JoinColumn({ name: 'role_id' })
   role: Role;
 
@@ -50,7 +53,7 @@ export class User {
 
   @OneToMany(
     () => PasswordResetToken,
-    (token: PasswordResetToken) => token.user,
+    (token: PasswordResetToken) => token.user
   )
   passwordResetTokens: PasswordResetToken[];
 }

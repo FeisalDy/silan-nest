@@ -5,7 +5,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { User } from '../../users/entities/user.entity.js';
+import { User } from '../../users/entities/user.entity';
 import { Role as RoleEnum } from '../../../common/constants/role.constant';
 @Entity('roles')
 export class Role {

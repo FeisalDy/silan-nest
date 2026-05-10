@@ -2,8 +2,6 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { Job } from 'bullmq';
-import slugify from 'slugify';
-import { pinyin } from 'pinyin';
 import { Novel } from '../entities/novel.entity';
 import { NovelTranslation } from '../entities/novel-translation.entity';
 import { Chapter } from '../entities/chapter.entity';
@@ -15,6 +13,7 @@ import {
   NOVEL_IMPORT_QUEUE,
   NovelImportJobPayload,
 } from './novel-import.queue';
+import { BuildSlug } from '@/common/utils/build-novel-slug.util';
 
 @Processor(NOVEL_IMPORT_QUEUE)
 export class NovelImportProcessor extends WorkerHost {
@@ -49,7 +48,7 @@ export class NovelImportProcessor extends WorkerHost {
 
       const savedNovel = await manager.save(novel);
 
-      const slug = this.buildSlug(parsedNovel.title);
+      const slug = BuildSlug(parsedNovel.title);
 
       await manager.save(
         manager.create(NovelTranslation, {
@@ -126,22 +125,5 @@ export class NovelImportProcessor extends WorkerHost {
     );
 
     return author;
-  }
-
-  /**
-   * Generate URL-safe slug
-   */
-  private buildSlug(title: string): string {
-    const base = /\p{Script=Han}/u.test(title)
-      ? pinyin(title, { style: 'normal' }).flat().join(' ')
-      : title;
-
-    const slug = slugify(base, {
-      lower: true,
-      strict: true,
-      trim: true,
-    });
-
-    return slug || 'novel';
   }
 }
