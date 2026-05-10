@@ -69,6 +69,9 @@ export default class ChapterSeeder implements Seeder {
       }
     }
 
-    await chapterRepository.save(chapters);
+    const chunkSize = 500;
+    for (let i = 0; i < chapters.length; i += chunkSize) {
+      await chapterRepository.save(chapters.slice(i, i + chunkSize));
+    }
   }
 }

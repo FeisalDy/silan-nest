@@ -8,26 +8,32 @@ import {Lang} from '@/common/constants/lang.constant';
 export default class ChapterTranslationSeeder implements Seeder {
   async run(dataSource: DataSource, factoryManager: SeederFactoryManager) {
     const chapterRepository = dataSource.getRepository(Chapter);
+    const translationRepository = dataSource.getRepository(ChapterTranslation);
 
     const chapters = await chapterRepository.find();
-
     const chapterTranslationFactory = factoryManager.get(ChapterTranslation);
 
-    const translations: ChapterTranslation[] = [];
+    const chunkSize = 500;
 
-    for (const chapter of chapters) {
-      for (const lang of Object.values(Lang)) {
-        translations.push(
-          await chapterTranslationFactory.make({
-            chapterId: chapter.id,
-            chapter,
-            languageCode: lang,
-            isDefault: lang === Lang.CHINESE_PRC,
-          })
-        );
-      }
+    for (let i = 0; i < chapters.length; i += chunkSize) {
+      const chunk = chapters.slice(i, i + chunkSize);
+      const chunkTranslations: ChapterTranslation[] = [];
+
+      await Promise.all(
+        chunk.map(async (chapter) => {
+          for (const lang of Object.values(Lang)) {
+            const translation = await chapterTranslationFactory.make({
+              chapterId: chapter.id,
+              chapter,
+              languageCode: lang,
+              isDefault: lang === Lang.CHINESE_PRC,
+            });
+            chunkTranslations.push(translation);
+          }
+        })
+      );
+
+      await translationRepository.save(chunkTranslations);
     }
-
-    await dataSource.getRepository(ChapterTranslation).save(translations);
   }
 }
