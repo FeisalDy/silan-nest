@@ -102,7 +102,13 @@ export class NovelsService {
 
     if (!novel) return null;
 
-    return this.mapNovelToDto(novel);
+    const chapterCount = await this.chaptersRepository.count({
+      where: { novelId: novel.id },
+    });
+
+    const dto = this.mapNovelToDto(novel);
+    dto.chapterCount = chapterCount;
+    return dto;
   }
 
   async paginateNovelChapters(novelId: string, pageOptionsDto: PageOptionsDto) {

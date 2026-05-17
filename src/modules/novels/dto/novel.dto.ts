@@ -29,6 +29,9 @@ export class NovelDto {
   @ApiPropertyOptional({ type: [String] })
   aliases: string[];
 
+  @ApiPropertyOptional()
+  chapterCount?: number;
+
   @ApiProperty()
   createdAt: Date;
 }
