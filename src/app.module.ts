@@ -12,42 +12,24 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    BullModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        connection: {
-          host: config.get<string>('REDIS_HOST', 'localhost'),
-          port: config.get<number>('REDIS_PORT', 6379),
-          password: config.get<string>('REDIS_PASSWORD'),
-        },
-      }),
-    }),
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
-      serveStaticOptions: {
-        index: false,
+  imports: [ConfigModule.forRoot({
+    isGlobal: true,
+  }), BullModule.forRootAsync({
+    inject: [ConfigService], useFactory: (config: ConfigService) => ({
+      connection: {
+        host: config.get<string>('REDIS_HOST', 'localhost'), port: config.get<number>('REDIS_PORT',
+          6379), password: config.get<string>('REDIS_PASSWORD'),
       },
     }),
-    DatabaseModule,
-    AuthModule,
-    UsersModule,
-    NovelsModule,
-  ],
-  controllers: [],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: SessionGuard,
+  }), ServeStaticModule.forRoot({
+    rootPath: join(process.cwd(), 'uploads'), serveRoot: '/uploads', serveStaticOptions: {
+      index: false,
     },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
-  ],
+  }), DatabaseModule, AuthModule, UsersModule, NovelsModule], controllers: [], providers: [{
+    provide: APP_GUARD, useClass: SessionGuard,
+  }, {
+    provide: APP_GUARD, useClass: RolesGuard,
+  }],
 })
-export class AppModule {}
+export class AppModule {
+}

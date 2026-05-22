@@ -25,13 +25,19 @@ import { ChapterTranslation } from './entities/chapter-translation.entity';
 import {
   NOVEL_TRANSLATION_JOB, NOVEL_TRANSLATION_QUEUE, NovelTranslationJobPayload,
 } from './queues/novel-translation.queue';
+import {
+  NOVEL_INDEX_JOB, NOVEL_INDEX_QUEUE, NovelIndexJobPayload,
+} from './queues/novel-index.queue';
+import { SearchService } from '@/infrastructure/search/search.service';
 
 @Injectable()
 export class NovelsService {
   constructor(@InjectRepository(Novel) private novelsRepository: Repository<Novel>,
     @InjectRepository(Chapter) private chaptersRepository: Repository<Chapter>,
     @InjectQueue(NOVEL_IMPORT_QUEUE) private novelImportQueue: Queue<NovelImportJobPayload>,
-    @InjectQueue(NOVEL_TRANSLATION_QUEUE) private novelTranslationQueue: Queue<NovelTranslationJobPayload>) {
+    @InjectQueue(NOVEL_TRANSLATION_QUEUE) private novelTranslationQueue: Queue<NovelTranslationJobPayload>,
+    @InjectQueue(NOVEL_INDEX_QUEUE) private novelIndexQueue: Queue<NovelIndexJobPayload>,
+    private readonly searchService: SearchService) {
   }
 
   async paginateNovels(pageOptionsDto: PageOptionsDto) {
@@ -292,6 +298,74 @@ export class NovelsService {
     return result;
   }
 
+  async queueNovelIndex(novelId: string) {
+    const novel = await this.findNovelBySlugOrId(novelId);
+    if (!novel) {
+      throw new NotFoundException('Novel not found');
+    }
+
+    const jobId = `index-${novel.id}`;
+    //todo: make it independent from novel translation job, so it can be queued even if translation is in progress
+
+    const job = await this.novelIndexQueue.add(NOVEL_INDEX_JOB, { novelId: novel.id });
+
+    return {
+      status: 'queued', jobId: job.id,
+    };
+  }
+
+  async getIndexJobStatus(jobId: string) {
+    const job = await this.novelIndexQueue.getJob(jobId);
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+    const state = await job.getState();
+    const result: { jobId: string; status: string; failedReason?: string } = {
+      jobId, status: state,
+    };
+
+    if (state === 'failed') {
+      result.failedReason = job.failedReason ?? 'Unknown error';
+    }
+
+    return result;
+  }
+
+  async indexNovelChapters(novelId: string): Promise<void> {
+    const chapters = await this.chaptersRepository
+      .createQueryBuilder('chapter')
+      .leftJoinAndSelect('chapter.translations', 'translation')
+      .where('chapter.novel_id = :novelId', { novelId })
+      .andWhere('translation.language_code = :lang', {
+        lang: Lang.ENGLISH,
+      })
+      .getMany();
+
+    const documents = chapters.flatMap((chapter) => {
+      const translation = chapter.translations.find((t) => t.languageCode as Lang === Lang.ENGLISH);
+
+      if (!translation?.content) {
+        return [];
+      }
+
+      return [{
+        id: translation.id,
+
+        document: {
+          id: translation.id,
+
+          chapterId: chapter.id,
+
+          languageCode: translation.languageCode,
+
+          content: this.normalizeSearchContent(translation.content),
+        },
+      }];
+    });
+
+    await this.searchService.bulkIndexChapters(documents);
+  }
+
   private pickTranslation<T extends {
     languageCode: string; isDefault?: boolean;
   }, >(translations: T[] | undefined): T | undefined {
@@ -330,5 +404,13 @@ export class NovelsService {
     return {
       id: chapter.id, novelId: chapter.novelId, chapterNumber: chapter.chapterNumber, chapterSubNumber: chapter.chapterSubNumber, volumeNumber: chapter.volumeNumber, languageCode: translation?.languageCode ?? '', title: translation?.title ?? null, content: content ?? '', createdAt: chapter.createdAt,
     };
+  }
+
+  private normalizeSearchContent(content: string): string {
+    return content
+      .replace(/\r/g, ' ')
+      .replace(/\n+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 }

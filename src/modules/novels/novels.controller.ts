@@ -90,6 +90,14 @@ export class NovelsController {
     return this.novelsService.getTranslationJobStatus(novelId);
   }
 
+  @Post(':novelId/index') indexNovel(@Param('novelId') novelId: string) {
+    return this.novelsService.queueNovelIndex(novelId);
+  }
+
+  @Get('index/jobs/:jobId') getIndexJobStatus(@Param('jobId') jobId: string) {
+    return this.novelsService.getIndexJobStatus(jobId);
+  }
+
   @Get(':novelId/chapters') findChaptersByNovelId(@Param('novelId') novelId: string,
     @Query() pageOptionsDto: PageOptionsDto) {
     return this.novelsService.paginateNovelChapters(novelId, pageOptionsDto);
