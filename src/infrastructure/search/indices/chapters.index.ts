@@ -1,5 +1,8 @@
+import { estypes } from '@elastic/elasticsearch';
+
 export const CHAPTER_TRANSLATION_INDEX = 'chapter_translations';
-export const chapterIndexSettings = {
+
+export const chapterIndexSettings: estypes.IndicesCreateRequest = {
   index: CHAPTER_TRANSLATION_INDEX,
 
   mappings: {

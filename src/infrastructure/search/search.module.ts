@@ -7,6 +7,7 @@ import { NoopSearchAdapter } from '@/infrastructure/search/adapters/noopsearch.a
 import { SEARCH_ADAPTER } from './search.constants';
 import { IndexManagerService } from '@/infrastructure/search/indices/index-manager.service';
 import { ConfigService } from '@nestjs/config';
+import { isTruthyEnv } from '@/common/utils/is-truthy-env.util';
 
 @Module({})
 export class SearchModule {
@@ -14,24 +15,45 @@ export class SearchModule {
     return {
       module: SearchModule,
 
-      imports: [ElasticsearchModule.registerAsync({
-        inject: [ConfigService],
+      imports: [
+        ElasticsearchModule.registerAsync({
+          inject: [ConfigService],
 
-        useFactory: (config: ConfigService) => ({
-          node: config.get('ELASTICSEARCH_NODE') || 'http://localhost:9200',
+          useFactory: (config: ConfigService) => ({
+            node: config.get('ELASTICSEARCH_NODE'),
+            auth: {
+              username: config.get<string>('ELASTICSEARCH_USERNAME', 'elastic'),
+              password: config.get<string>('ELASTICSEARCH_PASSWORD', ''),
+            },
+
+            tls: {
+              rejectUnauthorized: false,
+            },
+          }),
         }),
-      })],
+      ],
 
-      providers: [SearchService, IndexManagerService, ElasticsearchAdapter, NoopSearchAdapter, {
-        provide: SEARCH_ADAPTER,
+      providers: [
+        SearchService,
+        IndexManagerService,
+        ElasticsearchAdapter,
+        NoopSearchAdapter,
+        {
+          provide: SEARCH_ADAPTER,
 
-        inject: [ConfigService, ElasticsearchAdapter, NoopSearchAdapter], useFactory: (config: ConfigService,
-          real: ElasticsearchAdapter,
-          dummy: NoopSearchAdapter) => {
-          const enabled = config.get('ELASTICSEARCH_ENABLED') === 'true';
-          return enabled ? real : dummy;
+          inject: [ConfigService, ElasticsearchAdapter, NoopSearchAdapter],
+          useFactory: (
+            config: ConfigService,
+            real: ElasticsearchAdapter,
+            dummy: NoopSearchAdapter
+          ) => {
+            const enabled =
+              isTruthyEnv(config.get('ELASTICSEARCH_ENABLED'));
+            return enabled ? real : dummy;
+          },
         },
-      }], exports: [SearchService],
+      ],
+      exports: [SearchService],
     };
   }
 }

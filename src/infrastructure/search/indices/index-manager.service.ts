@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 
 import { CHAPTER_TRANSLATION_INDEX, chapterIndexSettings } from '@/infrastructure/search/indices/chapters.index';
+import { isTruthyEnv } from '@/common/utils/is-truthy-env.util';
 
 @Injectable()
 export class IndexManagerService implements OnModuleInit {
@@ -15,7 +16,8 @@ export class IndexManagerService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    const enabled = this.config.get<string>('ELASTICSEARCH_ENABLED') === 'true';
+    const enabled =
+      isTruthyEnv(this.config.get<string>('ELASTICSEARCH_ENABLED'));
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
 
     if (!enabled) {

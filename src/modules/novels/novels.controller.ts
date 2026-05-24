@@ -11,6 +11,7 @@ import {
   Body,
   HttpStatus,
   HttpCode,
+  BadRequestException,
 } from '@nestjs/common';
 import { NovelsService } from './novels.service';
 import { PageOptionsDto } from '../../common/dto/page-options.dto';
@@ -27,6 +28,14 @@ export class NovelsController {
 
   @Get() async findAll(@Query() pageOptionsDto: PageOptionsDto) {
     return this.novelsService.paginateNovels(pageOptionsDto);
+  }
+
+  @Get('search')
+  searchNovelsByChapterKeyword(@Query('q') query: string) {
+    if (!query) {
+      throw new BadRequestException('Query parameter q is required');
+    }
+    return this.novelsService.searchNovelsByChapterKeyword(query);
   }
 
   @Post('import') @UseInterceptors(FileInterceptor('file')) @ApiConsumes('multipart/form-data') @ApiBody({
@@ -94,8 +103,8 @@ export class NovelsController {
     return this.novelsService.queueNovelIndex(novelId);
   }
 
-  @Get('index/jobs/:jobId') getIndexJobStatus(@Param('jobId') jobId: string) {
-    return this.novelsService.getIndexJobStatus(jobId);
+  @Get(':novelId/index') getIndexJobStatus(@Param('novelId') novelId: string) {
+    return this.novelsService.getIndexJobStatus(novelId);
   }
 
   @Get(':novelId/chapters') findChaptersByNovelId(@Param('novelId') novelId: string,
