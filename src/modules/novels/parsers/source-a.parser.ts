@@ -1,7 +1,10 @@
 import {
-  NovelParser, ParsedChapter, ParsedNovel,
+  NovelParser,
+  ParsedChapter,
+  ParsedNovel,
 } from '../interfaces/parsed-novel.interface';
 import { Lang } from '../../../common/constants/lang.constant';
+import { Injectable } from '@nestjs/common';
 
 /**
  * SourceA format example:
@@ -18,7 +21,7 @@ import { Lang } from '../../../common/constants/lang.constant';
  * 第1章 第一章 精灵女王不好当
  * <content>
  */
-
+@Injectable()
 export class SourceAParser implements NovelParser {
   private static readonly TITLE_RE = /^书籍名称：(.+)$/m;
   private static readonly AUTHOR_RE = /^作者名称：(.+)$/m;
@@ -29,16 +32,26 @@ export class SourceAParser implements NovelParser {
   parse(text: string, chapterLimit?: number): ParsedNovel {
     const title = SourceAParser.TITLE_RE.exec(text)?.[1]?.trim() ?? null;
     const author = SourceAParser.AUTHOR_RE.exec(text)?.[1]?.trim() ?? null;
-    const status = this.mapStatus(SourceAParser.STATUS_RE.exec(text)?.[1]?.trim() ?? null);
+    const status = this.mapStatus(
+      SourceAParser.STATUS_RE.exec(text)?.[1]?.trim() ?? null
+    );
 
     const chapters = this.extractChapters(text, chapterLimit);
 
     return {
-      title, author, status, synopsis: null, chapters, languageCode: Lang.CHINESE_PRC,
+      title,
+      author,
+      status,
+      synopsis: null,
+      chapters,
+      languageCode: Lang.CHINESE_PRC,
     };
   }
 
-  private extractChapters(text: string, chapterLimit?: number): ParsedChapter[] {
+  private extractChapters(
+    text: string,
+    chapterLimit?: number
+  ): ParsedChapter[] {
     const chapters: ParsedChapter[] = [];
     const headingRe = new RegExp(SourceAParser.CHAPTER_HEADING_RE.source, 'gm');
 
@@ -81,9 +94,17 @@ export class SourceAParser implements NovelParser {
     return chapters;
   }
 
-  private buildChapter(match: RegExpExecArray, content: string, volumeNumber: number): ParsedChapter {
+  private buildChapter(
+    match: RegExpExecArray,
+    content: string,
+    volumeNumber: number
+  ): ParsedChapter {
     return {
-      chapterNumber: parseInt(match[1], 10), chapterSubNumber: 0, volumeNumber, title: match[2]?.trim() ?? '', content,
+      chapterNumber: parseInt(match[1], 10),
+      chapterSubNumber: 0,
+      volumeNumber,
+      title: match[2]?.trim() ?? '',
+      content,
     };
   }
 

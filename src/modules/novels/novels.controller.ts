@@ -23,52 +23,17 @@ import { Role } from '../../common/constants/role.constant';
 @ApiTags('novels')
 @Controller('novels')
 export class NovelsController {
-  constructor(private readonly novelsService: NovelsService) {
-  }
+  constructor(private readonly novelsService: NovelsService) {}
 
   @Get() async findAll(@Query() pageOptionsDto: PageOptionsDto) {
     return this.novelsService.paginateNovels(pageOptionsDto);
   }
 
-  @Get('search')
-  searchNovelsByChapterKeyword(@Query('q') query: string) {
+  @Get('search') searchNovelsByChapterKeyword(@Query('q') query: string) {
     if (!query) {
       throw new BadRequestException('Query parameter q is required');
     }
     return this.novelsService.searchNovelsByChapterKeyword(query);
-  }
-
-  @Post('import') @UseInterceptors(FileInterceptor('file')) @ApiConsumes('multipart/form-data') @ApiBody({
-    schema: {
-      type: 'object', required: ['file', 'source'], properties: {
-        file: {
-          type: 'string', format: 'binary', description: 'Novel .txt file to import',
-        }, source: {
-          type: 'string', description: 'Source identifier (e.g. source-a, source-b)',
-        },
-      },
-    },
-  }) async importNovel(@UploadedFile() file: Express.Multer.File, @Body('source') source: string) {
-    return this.novelsService.importNovelFromTxt(file, source);
-  }
-
-  @Post('import/preview') @Roles(Role.EDITOR) @HttpCode(HttpStatus.OK) @UseInterceptors(FileInterceptor('file')) @ApiConsumes(
-    'multipart/form-data') @ApiBody({
-    schema: {
-      type: 'object', required: ['file', 'source'], properties: {
-        file: {
-          type: 'string', format: 'binary', description: 'Novel .txt file to preview',
-        }, source: {
-          type: 'string', description: 'Source identifier (e.g. source-a, source-b)',
-        },
-      },
-    },
-  }) previewNovel(@UploadedFile() file: Express.Multer.File, @Body('source') source: string) {
-    return this.novelsService.previewNovelFromTxt(file, source, 10);
-  }
-
-  @Get('import/:jobId') getImportJobStatus(@Param('jobId') jobId: string) {
-    return this.novelsService.getImportJobStatus(jobId);
   }
 
   @Get(':identifier') async findOne(@Param('identifier') identifier: string) {
@@ -81,21 +46,32 @@ export class NovelsController {
     return novel;
   }
 
-  @Post(':novelId/translate') @ApiBody({
-    schema: {
-      type: 'object', required: ['targetLang'], properties: {
-        targetLang: {
-          type: 'string', description: 'Target language code (e.g. en, id, ja)',
-        },
-      },
-    },
-  }) translateNovel(@Param('novelId') novelId: string, @Body() body: { targetLang: string }) {
-    return this.novelsService.queueTranslation({
-      novelId, targetLang: body.targetLang,
-    });
-  }
+  // @Post(':novelId/translate')
+  // @ApiBody({
+  //   schema: {
+  //     type: 'object',
+  //     required: ['targetLang'],
+  //     properties: {
+  //       targetLang: {
+  //         type: 'string',
+  //         description: 'Target language code (e.g. en, id, ja)',
+  //       },
+  //     },
+  //   },
+  // })
+  // translateNovel(
+  //   @Param('novelId') novelId: string,
+  //   @Body() body: { targetLang: string }
+  // ) {
+  //   return this.novelsService.queueTranslation({
+  //     novelId,
+  //     targetLang: body.targetLang,
+  //   });
+  // }
 
-  @Get(':novelId/translate') getTranslateStatus(@Param('novelId') novelId: string) {
+  @Get(':novelId/translate') getTranslateStatus(
+    @Param('novelId') novelId: string
+  ) {
     return this.novelsService.getTranslationJobStatus(novelId);
   }
 
@@ -107,26 +83,48 @@ export class NovelsController {
     return this.novelsService.getIndexJobStatus(novelId);
   }
 
-  @Get(':novelId/chapters') findChaptersByNovelId(@Param('novelId') novelId: string,
-    @Query() pageOptionsDto: PageOptionsDto) {
+  @Get(':novelId/chapters') findChaptersByNovelId(
+    @Param('novelId') novelId: string,
+    @Query() pageOptionsDto: PageOptionsDto
+  ) {
     return this.novelsService.paginateNovelChapters(novelId, pageOptionsDto);
   }
 
-  @Get(':novelId/chapters/:volumeNumber/:chapterNumber') async getMainChapter(@Param('novelId') novelId: string,
+  @Get(':novelId/chapters/:volumeNumber/:chapterNumber') async getMainChapter(
+    @Param('novelId') novelId: string,
     @Param('volumeNumber', ParseIntPipe) volumeNumber: number,
-    @Param('chapterNumber', ParseIntPipe) chapterNumber: number) {
+    @Param('chapterNumber', ParseIntPipe) chapterNumber: number
+  ) {
     return this.getChapter(novelId, volumeNumber, chapterNumber, 0);
   }
 
-  @Get(':novelId/chapters/:volumeNumber/:chapterNumber/:chapterSubNumber') async getSubChapter(@Param('novelId') novelId: string,
+  @Get(':novelId/chapters/:volumeNumber/:chapterNumber/:chapterSubNumber')
+  async getSubChapter(
+    @Param('novelId') novelId: string,
     @Param('volumeNumber', ParseIntPipe) volumeNumber: number,
     @Param('chapterNumber', ParseIntPipe) chapterNumber: number,
-    @Param('chapterSubNumber', ParseIntPipe) chapterSubNumber: number) {
-    return this.getChapter(novelId, volumeNumber, chapterNumber, chapterSubNumber);
+    @Param('chapterSubNumber', ParseIntPipe) chapterSubNumber: number
+  ) {
+    return this.getChapter(
+      novelId,
+      volumeNumber,
+      chapterNumber,
+      chapterSubNumber
+    );
   }
 
-  private async getChapter(novelId: string, volumeNumber: number, chapterNumber: number, chapterSubNumber: number) {
-    const chapter = await this.novelsService.findChapter(novelId, volumeNumber, chapterNumber, chapterSubNumber);
+  private async getChapter(
+    novelId: string,
+    volumeNumber: number,
+    chapterNumber: number,
+    chapterSubNumber: number
+  ) {
+    const chapter = await this.novelsService.findChapter(
+      novelId,
+      volumeNumber,
+      chapterNumber,
+      chapterSubNumber
+    );
 
     if (!chapter) {
       throw new NotFoundException('Chapter not found');

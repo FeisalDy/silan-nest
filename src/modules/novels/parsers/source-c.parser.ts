@@ -4,6 +4,7 @@ import {
   ParsedNovel,
 } from '../interfaces/parsed-novel.interface';
 import { Lang } from '../../../common/constants/lang.constant';
+import { Injectable } from '@nestjs/common';
 
 /**
  * SourceC — multi-pattern auto-detect parser.
@@ -110,7 +111,7 @@ function splitAndMergeChapters(text: string): string[][] | null {
 // ---------------------------------------------------------------------------
 // Parser
 // ---------------------------------------------------------------------------
-
+@Injectable()
 export class SourceCParser implements NovelParser {
   parse(text: string): ParsedNovel {
     // TODO: implement title extraction for this source format

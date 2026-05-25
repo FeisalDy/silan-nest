@@ -13,7 +13,7 @@ export class AuthService {
     @InjectRepository(Session)
     private readonly sessionRepo: Repository<Session>,
 
-    private readonly usersService: UsersService,
+    private readonly usersService: UsersService
   ) {}
 
   async login(user: User, ipAddress?: string, userAgent?: string) {
@@ -70,7 +70,7 @@ export class AuthService {
     });
 
     if (!session || session.expiresAt < new Date()) {
-      // TODO: Let expired sessions naturally fail or Run a background job / cron cleanup instead
+      // TODO: Let expired sessions naturally fail or Run a background jobs / cron cleanup instead
       if (session) await this.sessionRepo.remove(session); // Cleanup expired
       throw new UnauthorizedException('Invalid or expired session');
     }

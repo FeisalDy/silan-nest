@@ -1,35 +1,46 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { BullModule } from '@nestjs/bullmq';
+import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { NovelsModule } from './modules/novels/novels.module';
+import { BullmqInfrastructureModule } from './infrastructure/bullmq/bullmq.module';
 import { APP_GUARD } from '@nestjs/core';
 import { SessionGuard } from './modules/auth/guards/session.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { JobsModule } from '@/modules/jobs/jobs.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({
-    isGlobal: true,
-  }), BullModule.forRootAsync({
-    inject: [ConfigService], useFactory: (config: ConfigService) => ({
-      connection: {
-        host: config.get<string>('REDIS_HOST', 'localhost'), port: config.get<number>('REDIS_PORT',
-          6379), password: config.get<string>('REDIS_PASSWORD'),
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+      serveStaticOptions: {
+        index: false,
       },
     }),
-  }), ServeStaticModule.forRoot({
-    rootPath: join(process.cwd(), 'uploads'), serveRoot: '/uploads', serveStaticOptions: {
-      index: false,
+    BullmqInfrastructureModule,
+    DatabaseModule,
+    AuthModule,
+    UsersModule,
+    NovelsModule,
+    JobsModule,
+  ],
+  controllers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: SessionGuard,
     },
-  }), DatabaseModule, AuthModule, UsersModule, NovelsModule], controllers: [], providers: [{
-    provide: APP_GUARD, useClass: SessionGuard,
-  }, {
-    provide: APP_GUARD, useClass: RolesGuard,
-  }],
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
 })
-export class AppModule {
-}
+export class AppModule {}
