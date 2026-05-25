@@ -27,7 +27,7 @@ export class SourceAParser implements NovelParser {
   private static readonly CHAPTER_HEADING_RE = /^第\s*(\d+)\s*章\s*(.+)$/m;
 
   parse(text: string, chapterLimit?: number): ParsedNovel {
-    const title = SourceAParser.TITLE_RE.exec(text)?.[1]?.trim() ?? '';
+    const title = SourceAParser.TITLE_RE.exec(text)?.[1]?.trim() ?? null;
     const author = SourceAParser.AUTHOR_RE.exec(text)?.[1]?.trim() ?? null;
     const status = this.mapStatus(SourceAParser.STATUS_RE.exec(text)?.[1]?.trim() ?? null);
 

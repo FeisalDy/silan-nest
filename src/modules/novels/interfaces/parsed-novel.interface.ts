@@ -7,7 +7,7 @@ export interface ParsedChapter {
 }
 
 export interface ParsedNovel {
-  title: string;
+  title: string | null;
   author: string | null;
   synopsis: string | null;
   status: string;
