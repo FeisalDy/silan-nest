@@ -76,7 +76,7 @@ export class JobsController {
     return this.jobsService.previewNovelImport(file, source, 10);
   }
 
-  @Post('translate-novel/:novelId')
+  @Post('process-novel/:novelId')
   @ApiBody({
     schema: {
       type: 'object',
@@ -89,11 +89,11 @@ export class JobsController {
       },
     },
   })
-  translateNovel(
+  processNovel(
     @Param('novelId') novelId: string,
     @Body() body: { targetLang: Lang }
   ) {
-    return this.jobsService.enqueueNovelTranslate(novelId, body.targetLang);
+    return this.jobsService.enqueueNovelProcessing(novelId, body.targetLang);
   }
 
   @Get(':jobId')

@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
+import { InjectFlowProducer, InjectQueue } from '@nestjs/bullmq';
 import {
   NOVEL_IMPORT_JOB,
   NOVEL_IMPORT_QUEUE,
   NovelImportJobPayload,
 } from '@/infrastructure/bullmq/queues/novel-import.queue';
-import { Queue } from 'bullmq';
+import { FlowProducer, Queue } from 'bullmq';
 import { NovelParserRegistry } from '@/modules/novels/parsers/novel-parser.registry';
 import { NovelTitleGenerator } from '@/common/utils/novel-title-generator.util';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,6 +20,13 @@ import {
 import { NovelsService } from '@/modules/novels/novels.service';
 import { UpdateJobStatusDto } from '@/modules/jobs/dto/update-status.dto';
 import { Lang } from '@/common/constants/lang.constant';
+import { NOVEL_TRANSLATE_AND_INDEX_FLOW } from '@/infrastructure/bullmq/flows/novel-translate-and-index.flow';
+import {
+  NOVEL_INDEX_JOB,
+  NOVEL_INDEX_QUEUE,
+  NovelIndexJobPayload,
+} from '@/infrastructure/bullmq/queues/novel-index.queue';
+import { JobFlowFactory } from '@/modules/jobs/factories/job-flow.factory';
 
 @Injectable()
 export class JobsService {
@@ -29,9 +36,14 @@ export class JobsService {
     private readonly novelImportQueue: Queue<NovelImportJobPayload>,
     @InjectQueue(NOVEL_TRANSLATION_QUEUE)
     private readonly novelTranslateQueue: Queue<NovelTranslationJobPayload>,
+    @InjectQueue(NOVEL_INDEX_QUEUE)
+    private readonly novelIndexQueue: Queue<NovelIndexJobPayload>,
+    @InjectFlowProducer(NOVEL_TRANSLATE_AND_INDEX_FLOW)
+    private readonly flowProducer: FlowProducer,
     private readonly parserRegistry: NovelParserRegistry,
     private readonly dataSource: DataSource,
-    private readonly novelService: NovelsService
+    private readonly novelService: NovelsService,
+    private readonly flowFactory: JobFlowFactory
   ) {}
 
   previewNovelImport(
@@ -94,46 +106,129 @@ export class JobsService {
     });
   }
 
-  async enqueueNovelTranslate(novelId: string, targetLang: Lang) {
+  async enqueueNovelProcessing(novelId: string, targetLang: Lang) {
     const novel = await this.novelService.findNovelBySlugOrId(novelId);
 
     if (!novel) {
       throw new NotFoundException('Novel not found');
     }
 
-    return await this.dataSource.transaction(async (manager) => {
-      const dbJob = manager.create(Job, {
-        type: JobType.TRANSLATE_NOVEL,
-        status: JobStatus.WAITING,
-        entityType: JobEntity.NOVEL,
-        entityId: novel.id,
-        payload: {
-          novelId,
-          targetLang,
-        },
-        attempts: 0,
+    const isEnglish = targetLang === Lang.ENGLISH;
+
+    const isAlreadyTranslated = await this.novelService.hasTranslation(
+      novel.id,
+      targetLang
+    );
+
+    const needTranslation = !isAlreadyTranslated;
+    const needIndexing = isEnglish;
+
+    if (!needTranslation && !needIndexing) {
+      return {
+        status: 'NO_ACTION_REQUIRED',
+      };
+    }
+
+    const { translateDbJob, indexDbJob } = await this.dataSource.transaction(
+      async (manager) => {
+        const translateJob = needTranslation
+          ? await manager.save(
+              Job,
+              manager.create(Job, {
+                type: JobType.TRANSLATE_NOVEL,
+                status: JobStatus.WAITING,
+                entityType: JobEntity.NOVEL,
+                entityId: novel.id,
+                payload: {
+                  novelId,
+                  targetLang,
+                },
+                attempts: 0,
+              })
+            )
+          : null;
+
+        const indexJob = needIndexing
+          ? await manager.save(
+              Job,
+              manager.create(Job, {
+                type: JobType.INDEX_NOVEL,
+                status: JobStatus.WAITING,
+                entityType: JobEntity.NOVEL,
+                entityId: novel.id,
+                payload: {
+                  novelId,
+                  targetLang,
+                },
+                attempts: 0,
+              })
+            )
+          : null;
+
+        return {
+          translateDbJob: translateJob,
+          indexDbJob: indexJob,
+        };
+      }
+    );
+
+    /**
+     * FLOW:
+     * translation -> indexing
+     */
+    if (translateDbJob && indexDbJob) {
+      const flowConfig = this.flowFactory.createTranslationAndIndexingFlow(
+        translateDbJob,
+        indexDbJob,
+        novelId,
+        targetLang
+      );
+
+      const flow = await this.flowProducer.add(flowConfig);
+
+      await this.jobsRepository.update(indexDbJob.id, {
+        queueJobId: flow.job.id,
       });
 
-      const savedDbJob = await manager.save(Job, dbJob);
+      const child = flow.children?.[0];
 
-      //TODO: Add FlowProducer to make translate job as child and index as parent. make sure that if the elastic seach is not enabled, dont let the nestJS processor handle the work, let the job still waiting
+      if (child) {
+        await this.jobsRepository.update(translateDbJob.id, {
+          queueJobId: child.job.id,
+        });
+      }
+    } else if (translateDbJob) {
+      /**
+       * Translation only
+       */
       const bullmqJob = await this.novelTranslateQueue.add(
         NOVEL_TRANSLATION_JOB,
         {
-          dbJobId: savedDbJob.id,
-          novelId: novelId,
-          targetLang: targetLang,
+          dbJobId: translateDbJob.id,
+          novelId,
+          targetLang,
         }
       );
 
-      savedDbJob.queueJobId = bullmqJob.id;
-      await manager.save(Job, savedDbJob);
+      await this.jobsRepository.update(translateDbJob.id, {
+        queueJobId: bullmqJob.id,
+      });
+    } else if (indexDbJob) {
+      const bullmqJob = await this.novelIndexQueue.add(NOVEL_INDEX_JOB, {
+        dbJobId: indexDbJob.id,
+        novelId,
+      });
 
-      return {
-        status: JobStatus.WAITING,
-        jobId: savedDbJob.id,
-      };
-    });
+      await this.jobsRepository.update(indexDbJob.id, {
+        queueJobId: bullmqJob.id,
+      });
+    }
+
+    return {
+      status: JobStatus.WAITING,
+      translateJobId: translateDbJob?.id,
+      indexJobId: indexDbJob?.id,
+    };
   }
 
   async getJob(jobId: string) {

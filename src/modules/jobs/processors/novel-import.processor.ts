@@ -30,15 +30,12 @@ export class NovelImportProcessor extends WorkerHost {
 
   @OnWorkerEvent('active')
   async onActive(job: Job<NovelImportJobPayload>) {
-    await this.jobsService.markRunning(job.data.dbJobId, job.attemptsMade + 1);
+    await this.jobsService.markRunning(job.data.dbJobId, job.attemptsMade);
   }
 
   @OnWorkerEvent('completed')
   async onCompleted(job: Job<NovelImportJobPayload>) {
-    await this.jobsService.markCompleted(
-      job.data.dbJobId,
-      job.attemptsMade + 1
-    );
+    await this.jobsService.markCompleted(job.data.dbJobId, job.attemptsMade);
   }
 
   @OnWorkerEvent('failed')
@@ -48,7 +45,7 @@ export class NovelImportProcessor extends WorkerHost {
     await this.jobsService.markFailed(
       job.data.dbJobId,
       error,
-      job.attemptsMade + 1
+      job.attemptsMade
     );
   }
 }

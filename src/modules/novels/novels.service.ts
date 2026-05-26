@@ -44,6 +44,8 @@ export class NovelsService {
   constructor(
     @InjectRepository(Novel) private novelsRepository: Repository<Novel>,
     @InjectRepository(Chapter) private chaptersRepository: Repository<Chapter>,
+    @InjectRepository(NovelTranslation)
+    private novelTranslationRepository: Repository<NovelTranslation>,
     @InjectQueue(NOVEL_IMPORT_QUEUE)
     private novelImportQueue: Queue<NovelImportJobPayload>,
     @InjectQueue(NOVEL_TRANSLATION_QUEUE)
@@ -52,6 +54,13 @@ export class NovelsService {
     private novelIndexQueue: Queue<NovelIndexJobPayload>,
     private readonly searchService: SearchService
   ) {}
+
+  async hasTranslation(novelId: string, lang: Lang) {
+    return await this.novelTranslationRepository.existsBy({
+      novelId,
+      languageCode: lang,
+    });
+  }
 
   async paginateNovels(pageOptionsDto: PageOptionsDto) {
     const baseQuery = () => {
@@ -446,32 +455,32 @@ export class NovelsService {
     return result;
   }
 
-  async queueNovelIndex(novelId: string) {
-    const novel = await this.findNovelBySlugOrId(novelId);
-    if (!novel) {
-      throw new NotFoundException('Novel not found');
-    }
-
-    const jobId = `index-${novel.id}`;
-    const existingJob = await this.novelIndexQueue.getJob(jobId);
-    if (existingJob) {
-      const state = await existingJob.getState();
-
-      if (state === 'waiting' || state === 'active') {
-        throw new BadRequestException('Indexing already in progress');
-      }
-
-      await existingJob.remove();
-    }
-    const job = await this.novelIndexQueue.add(NOVEL_INDEX_JOB, {
-      novelId: novel.id,
-    });
-
-    return {
-      status: 'queued',
-      jobId: job.id,
-    };
-  }
+  // async queueNovelIndex(novelId: string) {
+  //   const novel = await this.findNovelBySlugOrId(novelId);
+  //   if (!novel) {
+  //     throw new NotFoundException('Novel not found');
+  //   }
+  //
+  //   const jobId = `index-${novel.id}`;
+  //   const existingJob = await this.novelIndexQueue.getJob(jobId);
+  //   if (existingJob) {
+  //     const state = await existingJob.getState();
+  //
+  //     if (state === 'waiting' || state === 'active') {
+  //       throw new BadRequestException('Indexing already in progress');
+  //     }
+  //
+  //     await existingJob.remove();
+  //   }
+  //   const job = await this.novelIndexQueue.add(NOVEL_INDEX_JOB, {
+  //     novelId: novel.id,
+  //   });
+  //
+  //   return {
+  //     status: 'queued',
+  //     jobId: job.id,
+  //   };
+  // }
 
   async getIndexJobStatus(novelId: string) {
     const novel = await this.findNovelBySlugOrId(novelId);

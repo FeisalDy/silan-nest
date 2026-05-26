@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { NOVEL_IMPORT_QUEUE } from './queues/novel-import.queue';
 import { NOVEL_TRANSLATION_QUEUE } from './queues/novel-translation.queue';
 import { NOVEL_INDEX_QUEUE } from './queues/novel-index.queue';
+import { NOVEL_TRANSLATE_AND_INDEX_FLOW } from '@/infrastructure/bullmq/flows/novel-translate-and-index.flow';
 
 @Global()
 @Module({
@@ -23,6 +24,9 @@ import { NOVEL_INDEX_QUEUE } from './queues/novel-index.queue';
       { name: NOVEL_TRANSLATION_QUEUE },
       { name: NOVEL_INDEX_QUEUE }
     ),
+    BullModule.registerFlowProducer({
+      name: NOVEL_TRANSLATE_AND_INDEX_FLOW,
+    }),
   ],
   providers: [],
   exports: [BullModule],
