@@ -23,8 +23,8 @@ export class Novel {
   @Column({ name: 'cover_url', type: 'varchar', length: 255, nullable: true })
   coverUrl: string | null;
 
-  @Column({ type: 'varchar', length: 50, default: 'completed' })
-  status: string;
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  status: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
@@ -38,7 +38,7 @@ export class Novel {
 
   @OneToMany(
     () => NovelTranslation,
-    (translation: NovelTranslation) => translation.novel,
+    (translation: NovelTranslation) => translation.novel
   )
   translations: NovelTranslation[];
 

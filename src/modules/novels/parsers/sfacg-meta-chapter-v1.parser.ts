@@ -7,7 +7,7 @@ import { Lang } from '../../../common/constants/lang.constant';
 import { Injectable } from '@nestjs/common';
 
 /**
- * SourceA format example:
+ * SfacgMetaChapterV1Parser format example:
  *
  * 书籍详细
  * 书籍名称：变成精灵女王的我又成了人族皇后
@@ -22,18 +22,44 @@ import { Injectable } from '@nestjs/common';
  * <content>
  */
 @Injectable()
-export class SourceAParser implements NovelParser {
+export class SfacgMetaChapterV1Parser implements NovelParser {
+  readonly formatId = 'sfacg-meta-chapter-v1';
+
   private static readonly TITLE_RE = /^书籍名称：(.+)$/m;
   private static readonly AUTHOR_RE = /^作者名称：(.+)$/m;
   private static readonly STATUS_RE = /^是否完结：(.+)$/m;
 
   private static readonly CHAPTER_HEADING_RE = /^第\s*(\d+)\s*章\s*(.+)$/m;
 
+  match(text: string): number {
+    let score = 0;
+
+    if (SfacgMetaChapterV1Parser.TITLE_RE.test(text)) {
+      score += 15;
+    }
+
+    if (SfacgMetaChapterV1Parser.AUTHOR_RE.test(text)) {
+      score += 20;
+    }
+
+    if (SfacgMetaChapterV1Parser.STATUS_RE.test(text)) {
+      score += 25;
+    }
+
+    if (SfacgMetaChapterV1Parser.CHAPTER_HEADING_RE.test(text)) {
+      score += 40;
+    }
+
+    return score;
+  }
+
   parse(text: string, chapterLimit?: number): ParsedNovel {
-    const title = SourceAParser.TITLE_RE.exec(text)?.[1]?.trim() ?? null;
-    const author = SourceAParser.AUTHOR_RE.exec(text)?.[1]?.trim() ?? null;
+    const title =
+      SfacgMetaChapterV1Parser.TITLE_RE.exec(text)?.[1]?.trim() ?? null;
+    const author =
+      SfacgMetaChapterV1Parser.AUTHOR_RE.exec(text)?.[1]?.trim() ?? null;
     const status = this.mapStatus(
-      SourceAParser.STATUS_RE.exec(text)?.[1]?.trim() ?? null
+      SfacgMetaChapterV1Parser.STATUS_RE.exec(text)?.[1]?.trim() ?? null
     );
 
     const chapters = this.extractChapters(text, chapterLimit);
@@ -53,7 +79,10 @@ export class SourceAParser implements NovelParser {
     chapterLimit?: number
   ): ParsedChapter[] {
     const chapters: ParsedChapter[] = [];
-    const headingRe = new RegExp(SourceAParser.CHAPTER_HEADING_RE.source, 'gm');
+    const headingRe = new RegExp(
+      SfacgMetaChapterV1Parser.CHAPTER_HEADING_RE.source,
+      'gm'
+    );
 
     let match: RegExpExecArray | null;
     let lastIndex = 0;
@@ -108,12 +137,12 @@ export class SourceAParser implements NovelParser {
     };
   }
 
-  private mapStatus(status: string | null): string {
-    if (!status) return 'unknown';
+  private mapStatus(status: string | null) {
+    if (!status) return null;
 
     if (status.includes('未完')) return 'ongoing';
     if (status.includes('完结')) return 'completed';
 
-    return 'unknown';
+    return null;
   }
 }

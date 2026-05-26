@@ -11,9 +11,8 @@ import { NovelsService } from './novels.service';
 import { NovelsController } from './novels.controller';
 import { SearchModule } from '@/infrastructure/search/search.module';
 import { NovelParserRegistry } from '@/modules/novels/parsers/novel-parser.registry';
-import { SourceBParser } from '@/modules/novels/parsers/source-b.parser';
-import { SourceAParser } from '@/modules/novels/parsers/source-a.parser';
-import { SourceCParser } from '@/modules/novels/parsers/source-c.parser';
+import { SfacgMetaChapterV1Parser } from '@/modules/novels/parsers/sfacg-meta-chapter-v1.parser';
+import { GenericCnChapterV1Parser } from '@/modules/novels/parsers/generic-cn-chapter-v1.parser';
 
 @Module({
   imports: [
@@ -30,9 +29,8 @@ import { SourceCParser } from '@/modules/novels/parsers/source-c.parser';
   ],
   providers: [
     NovelsService,
-    SourceAParser,
-    SourceBParser,
-    SourceCParser,
+    SfacgMetaChapterV1Parser,
+    GenericCnChapterV1Parser,
     NovelParserRegistry,
   ],
   exports: [TypeOrmModule, NovelsService, NovelParserRegistry],

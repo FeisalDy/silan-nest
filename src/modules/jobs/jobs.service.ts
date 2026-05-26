@@ -48,16 +48,14 @@ export class JobsService {
 
   previewNovelImport(
     file: Express.Multer.File,
-    source: string,
+    formatId?: string,
     chapterLimit?: number
   ) {
-    const text = file.buffer.toString('utf8');
-    const parser = this.parserRegistry.get(source);
-    return parser.parse(text, chapterLimit);
-  }
-
-  async enqueueNovelImport(file: Express.Multer.File, source: string) {
-    const parsedNovel = this.previewNovelImport(file, source);
+    const { parsedNovel, formatId: resolvedFormatId } = this.parseNovel(
+      file,
+      formatId,
+      chapterLimit
+    );
 
     if (!parsedNovel.title) {
       parsedNovel.title = NovelTitleGenerator.generate({
@@ -66,6 +64,15 @@ export class JobsService {
         languageCode: parsedNovel.languageCode,
       });
     }
+
+    return { parsedNovel, resolvedFormatId };
+  }
+
+  async enqueueNovelImport(file: Express.Multer.File, formatId?: string) {
+    const { parsedNovel, resolvedFormatId } = this.previewNovelImport(
+      file,
+      formatId
+    );
 
     return await this.dataSource.transaction(async (manager) => {
       const payloadNovel = {
@@ -82,7 +89,8 @@ export class JobsService {
         status: JobStatus.WAITING,
         entityType: JobEntity.NOVEL,
         payload: {
-          source,
+          formatId: resolvedFormatId,
+          source: resolvedFormatId,
           parsedNovel: payloadNovel,
         },
         attempts: 0,
@@ -92,7 +100,8 @@ export class JobsService {
 
       const bullmqJob = await this.novelImportQueue.add(NOVEL_IMPORT_JOB, {
         dbJobId: savedDbJob.id,
-        source,
+        formatId: resolvedFormatId,
+        source: resolvedFormatId,
         parsedNovel,
       });
 
@@ -274,5 +283,26 @@ export class JobsService {
 
   async updateStatus(jobId: string, payload: UpdateJobStatusDto) {
     await this.jobsRepository.update(jobId, payload);
+  }
+
+  private parseNovel(
+    file: Express.Multer.File,
+    formatId?: string,
+    chapterLimit?: number
+  ) {
+    // Limit the filesize to 256kb for format detection, so instead of O(file-size),
+    // its O(256kb) which is much faster for large files and still enough for format detection
+    const sample = file.buffer.subarray(0, 256_000).toString('utf8');
+
+    const parser = formatId
+      ? this.parserRegistry.getByFormatId(formatId)
+      : this.parserRegistry.detect(sample);
+
+    const fullText = file.buffer.toString('utf8');
+
+    return {
+      formatId: parser.formatId,
+      parsedNovel: parser.parse(fullText, chapterLimit),
+    };
   }
 }

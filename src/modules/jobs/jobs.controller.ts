@@ -33,7 +33,7 @@ export class JobsController {
   @ApiBody({ type: ImportNovelDto })
   importNovel(
     @UploadedFile() file: Express.Multer.File,
-    @Body('source') source: string
+    @Body('formatId') formatId?: string
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
@@ -45,7 +45,7 @@ export class JobsController {
       throw new BadRequestException('Only plain text (.txt) files are allowed');
     }
 
-    return this.jobsService.enqueueNovelImport(file, source);
+    return this.jobsService.enqueueNovelImport(file, formatId);
   }
 
   @Post('import-novel/preview')
@@ -58,7 +58,7 @@ export class JobsController {
   })
   previewImportedNovel(
     @UploadedFile() file: Express.Multer.File,
-    @Body('source') source: string
+    @Body('formatId') formatId?: string
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
@@ -70,7 +70,7 @@ export class JobsController {
       throw new BadRequestException('Only plain text (.txt) files are allowed');
     }
 
-    return this.jobsService.previewNovelImport(file, source, 10);
+    return this.jobsService.previewNovelImport(file, formatId, 10);
   }
 
   @Post('process-novel/:novelId')

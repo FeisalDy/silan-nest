@@ -18,7 +18,7 @@ export class NovelDto {
   coverUrl: string | null;
 
   @ApiProperty({ example: 'completed' })
-  status: string;
+  status: string | null;
 
   @ApiProperty()
   languageCode: string;

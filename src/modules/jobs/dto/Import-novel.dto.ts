@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ImportNovelDto {
   @ApiProperty({
@@ -8,9 +8,10 @@ export class ImportNovelDto {
   })
   file: any; // Multer file handled by interceptor
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: 'string',
-    description: 'Source identifier (e.g. source-a, source-b)',
+    description:
+      'Optional format identifier (e.g. sfacg-meta-chapter-v1). If omitted, the parser will be auto-detected.',
   })
-  source: string;
+  formatId?: string;
 }

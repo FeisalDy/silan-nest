@@ -31,7 +31,7 @@ export class NovelImportService {
       }
 
       const novel = manager.create(Novel, {
-        status: parsedNovel.status,
+        status: parsedNovel.status ?? null,
         authorId: author?.id ?? null,
       });
 

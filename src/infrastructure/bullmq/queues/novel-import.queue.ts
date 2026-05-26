@@ -5,6 +5,13 @@ export const NOVEL_IMPORT_JOB = 'process-novel-import';
 
 export interface NovelImportJobPayload {
   dbJobId: string;
-  source: string;
+  /**
+   * Parsing format identifier (schema/structure), not content origin.
+   */
+  formatId: string;
+  /**
+   * @deprecated Use `formatId` instead. Kept for backward compatibility.
+   */
+  source?: string;
   parsedNovel: ParsedNovel;
 }
