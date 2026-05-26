@@ -8,6 +8,8 @@ import { Job } from '@/modules/jobs/entities/job.entity';
 import { NovelImportProcessor } from '@/modules/jobs/processors/novel-import.processor';
 import { SearchModule } from '@/infrastructure/search/search.module';
 import { JobFlowFactory } from '@/modules/jobs/factories/job-flow.factory';
+import { NovelIndexService } from '@/modules/jobs/services/novel-index.service';
+import { NovelIndexProcessor } from '@/modules/jobs/processors/novel-index.processor';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { JobFlowFactory } from '@/modules/jobs/factories/job-flow.factory';
     NovelImportService,
     NovelImportProcessor,
     JobFlowFactory,
+    NovelIndexService,
+    NovelIndexProcessor,
   ],
   controllers: [JobsController],
 })
