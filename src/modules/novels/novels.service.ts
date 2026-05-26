@@ -1,43 +1,19 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import { Novel } from './entities/novel.entity';
-import { NovelParserFactory } from './parsers/novel-parser.factory';
-import {
-  NOVEL_IMPORT_JOB,
-  NOVEL_IMPORT_QUEUE,
-  NovelImportJobPayload,
-} from '@/infrastructure/bullmq/queues/novel-import.queue';
-
-import { PageOptionsDto } from '../../common/dto/page-options.dto';
-import { PageMetaDto } from '../../common/dto/page-meta.dto';
-import { PageDto } from '../../common/dto/page.dto';
+import { PageOptionsDto } from '@/common/dto/page-options.dto';
+import { PageMetaDto } from '@/common/dto/page-meta.dto';
+import { PageDto } from '@/common/dto/page.dto';
 import { NovelDto } from './dto/novel.dto';
 import { isUUID } from 'class-validator';
-import { Lang } from '../../common/constants/lang.constant';
+import { Lang } from '@/common/constants/lang.constant';
 import { Chapter } from './entities/chapter.entity';
 import { ChapterDto } from './dto/chapter.dto';
 import { NovelTranslation } from './entities/novel-translation.entity';
 import { AuthorTranslation } from './entities/author-translation.entity';
 import { ChapterTranslation } from './entities/chapter-translation.entity';
-import {
-  NOVEL_TRANSLATION_JOB,
-  NOVEL_TRANSLATION_QUEUE,
-  NovelTranslationJobPayload,
-} from '@/infrastructure/bullmq/queues/novel-translation.queue';
-import {
-  NOVEL_INDEX_JOB,
-  NOVEL_INDEX_QUEUE,
-  NovelIndexJobPayload,
-} from '@/infrastructure/bullmq/queues/novel-index.queue';
 import { SearchService } from '@/infrastructure/search/search.service';
-import { NovelTitleGenerator } from '@/common/utils/novel-title-generator.util';
 
 @Injectable()
 export class NovelsService {
@@ -46,12 +22,6 @@ export class NovelsService {
     @InjectRepository(Chapter) private chaptersRepository: Repository<Chapter>,
     @InjectRepository(NovelTranslation)
     private novelTranslationRepository: Repository<NovelTranslation>,
-    @InjectQueue(NOVEL_IMPORT_QUEUE)
-    private novelImportQueue: Queue<NovelImportJobPayload>,
-    @InjectQueue(NOVEL_TRANSLATION_QUEUE)
-    private novelTranslationQueue: Queue<NovelTranslationJobPayload>,
-    @InjectQueue(NOVEL_INDEX_QUEUE)
-    private novelIndexQueue: Queue<NovelIndexJobPayload>,
     private readonly searchService: SearchService
   ) {}
 
@@ -154,8 +124,6 @@ export class NovelsService {
     if (!hits.length) {
       return [];
     }
-
-    console.dir(hits, { depth: null });
 
     const chapterHighlightMap = new Map<string, string[]>();
     for (const hit of hits) {
@@ -356,194 +324,6 @@ export class NovelsService {
       .getOne();
   }
 
-  previewNovelFromTxt(
-    file: Express.Multer.File,
-    source: string,
-    chapterLimit?: number
-  ) {
-    const text = file.buffer.toString('utf-8');
-    const parser = NovelParserFactory.create(source);
-    return parser.parse(text, chapterLimit);
-  }
-
-  // async importNovelFromTxt(file: Express.Multer.File, source: string): Promise<{
-  //   status: string; jobId: string | undefined;
-  // }> {
-  //   const parsedNovel = this.previewNovelFromTxt(file, source);
-  //
-  //   if (!parsedNovel.title) {
-  //     parsedNovel.title = NovelTitleGenerator.generate({
-  //       fileName: file.originalname, firstChapterTitle: parsedNovel.chapters[0]?.title, languageCode: parsedNovel.languageCode,
-  //     });
-  //   }
-  //
-  //   const job = await this.novelImportQueue.add(NOVEL_IMPORT_JOB, {
-  //     source, parsedNovel,
-  //   });
-  //
-  //   return { status: 'queued', jobId: job.id };
-  // }
-  //
-  // async getImportJobStatus(jobId: string): Promise<{
-  //   jobId: string; status: string; failedReason?: string;
-  // }> {
-  //   const job = await this.novelImportQueue.getJob(jobId);
-  //
-  //   if (!job) {
-  //     return { jobId, status: 'Job not Found' };
-  //   }
-  //
-  //   const state = await job.getState();
-  //   const result: { jobId: string; status: string; failedReason?: string } = {
-  //     jobId, status: state,
-  //   };
-  //
-  //   if (state === 'failed') {
-  //     result.failedReason = job.failedReason ?? 'Unknown error';
-  //   }
-  //
-  //   return result;
-  // }
-  //
-  // async queueTranslation(payload: NovelTranslationJobPayload) {
-  //   const novel = await this.findNovelBySlugOrId(payload.novelId);
-  //
-  //   if (!novel) {
-  //     throw new NotFoundException('Novel not found');
-  //   }
-  //
-  //   const jobId = `translate-${novel.id}`;
-  //   const resolvedPayload = { ...payload, novelId: novel.id };
-  //
-  //   const existingJob = await this.novelTranslationQueue.getJob(jobId);
-  //   if (existingJob) {
-  //     const state = await existingJob.getState();
-  //
-  //     if (state === 'waiting' || state === 'active') {
-  //       throw new BadRequestException('Translation already in progress');
-  //     }
-  //
-  //     await existingJob.remove();
-  //   }
-  //   const job = await this.novelTranslationQueue.add(NOVEL_TRANSLATION_JOB, resolvedPayload, { jobId });
-  //
-  //   return {
-  //     status: 'queued', jobId: job.id,
-  //   };
-  // }
-
-  async getTranslationJobStatus(novelId: string) {
-    const novel = await this.findNovelBySlugOrId(novelId);
-    if (!novel) {
-      throw new NotFoundException('Novel not found');
-    }
-    const jobId = `translate-${novel.id}`;
-    const job = await this.novelTranslationQueue.getJob(jobId);
-    if (!job) {
-      throw new NotFoundException('Job not found');
-    }
-    const state = await job.getState();
-    const result: { jobId: string; status: string; failedReason?: string } = {
-      jobId,
-      status: state,
-    };
-
-    if (state === 'failed') {
-      result.failedReason = job.failedReason ?? 'Unknown error';
-    }
-
-    return result;
-  }
-
-  // async queueNovelIndex(novelId: string) {
-  //   const novel = await this.findNovelBySlugOrId(novelId);
-  //   if (!novel) {
-  //     throw new NotFoundException('Novel not found');
-  //   }
-  //
-  //   const jobId = `index-${novel.id}`;
-  //   const existingJob = await this.novelIndexQueue.getJob(jobId);
-  //   if (existingJob) {
-  //     const state = await existingJob.getState();
-  //
-  //     if (state === 'waiting' || state === 'active') {
-  //       throw new BadRequestException('Indexing already in progress');
-  //     }
-  //
-  //     await existingJob.remove();
-  //   }
-  //   const job = await this.novelIndexQueue.add(NOVEL_INDEX_JOB, {
-  //     novelId: novel.id,
-  //   });
-  //
-  //   return {
-  //     status: 'queued',
-  //     jobId: job.id,
-  //   };
-  // }
-
-  async getIndexJobStatus(novelId: string) {
-    const novel = await this.findNovelBySlugOrId(novelId);
-    if (!novel) {
-      throw new NotFoundException('Novel not found');
-    }
-    const jobId = `index-${novel.id}`;
-    const job = await this.novelIndexQueue.getJob(jobId);
-    if (!job) {
-      throw new NotFoundException('Job not found');
-    }
-    const state = await job.getState();
-    const result: { jobId: string; status: string; failedReason?: string } = {
-      jobId,
-      status: state,
-    };
-
-    if (state === 'failed') {
-      result.failedReason = job.failedReason ?? 'Unknown error';
-    }
-
-    return result;
-  }
-
-  async indexNovelChapters(novelId: string): Promise<void> {
-    const chapters = await this.chaptersRepository
-      .createQueryBuilder('chapter')
-      .leftJoinAndSelect('chapter.translations', 'translation')
-      .where('chapter.novel_id = :novelId', { novelId })
-      .andWhere('translation.language_code = :lang', {
-        lang: Lang.ENGLISH,
-      })
-      .getMany();
-
-    const documents = chapters.flatMap((chapter) => {
-      const translation = chapter.translations.find(
-        (t) => (t.languageCode as Lang) === Lang.ENGLISH
-      );
-
-      if (!translation?.content) {
-        return [];
-      }
-
-      return [
-        {
-          id: translation.id,
-
-          document: {
-            id: translation.id,
-
-            chapterId: chapter.id,
-
-            languageCode: translation.languageCode,
-
-            content: this.normalizeSearchContent(translation.content),
-          },
-        },
-      ];
-    });
-
-    await this.searchService.bulkIndexChapters(documents);
-  }
-
   private pickTranslation<
     T extends {
       languageCode: string;
@@ -621,13 +401,5 @@ export class NovelsService {
       content: content ?? '',
       createdAt: chapter.createdAt,
     };
-  }
-
-  private normalizeSearchContent(content: string): string {
-    return content
-      .replace(/\r/g, ' ')
-      .replace(/\n+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
   }
 }

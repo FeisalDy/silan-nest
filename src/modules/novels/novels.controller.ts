@@ -1,24 +1,15 @@
 import {
   Controller,
   Get,
-  Post,
   NotFoundException,
   Param,
   ParseIntPipe,
   Query,
-  UseInterceptors,
-  UploadedFile,
-  Body,
-  HttpStatus,
-  HttpCode,
   BadRequestException,
 } from '@nestjs/common';
 import { NovelsService } from './novels.service';
-import { PageOptionsDto } from '../../common/dto/page-options.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '../../common/constants/role.constant';
+import { PageOptionsDto } from '@/common/dto/page-options.dto';
+import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('novels')
 @Controller('novels')
@@ -44,43 +35,6 @@ export class NovelsController {
     }
 
     return novel;
-  }
-
-  // @Post(':novelId/translate')
-  // @ApiBody({
-  //   schema: {
-  //     type: 'object',
-  //     required: ['targetLang'],
-  //     properties: {
-  //       targetLang: {
-  //         type: 'string',
-  //         description: 'Target language code (e.g. en, id, ja)',
-  //       },
-  //     },
-  //   },
-  // })
-  // translateNovel(
-  //   @Param('novelId') novelId: string,
-  //   @Body() body: { targetLang: string }
-  // ) {
-  //   return this.novelsService.queueTranslation({
-  //     novelId,
-  //     targetLang: body.targetLang,
-  //   });
-  // }
-
-  @Get(':novelId/translate') getTranslateStatus(
-    @Param('novelId') novelId: string
-  ) {
-    return this.novelsService.getTranslationJobStatus(novelId);
-  }
-
-  @Post(':novelId/index') indexNovel(@Param('novelId') novelId: string) {
-    return this.novelsService.queueNovelIndex(novelId);
-  }
-
-  @Get(':novelId/index') getIndexJobStatus(@Param('novelId') novelId: string) {
-    return this.novelsService.getIndexJobStatus(novelId);
   }
 
   @Get(':novelId/chapters') findChaptersByNovelId(

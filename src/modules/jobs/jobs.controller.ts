@@ -8,7 +8,6 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
-  InternalServerErrorException,
   Patch,
   Param,
   UseGuards,
@@ -19,11 +18,9 @@ import { Roles } from '@/modules/auth/decorators/roles.decorator';
 import { Role } from '@/common/constants/role.constant';
 import { ImportNovelDto } from '@/modules/jobs/dto/Import-novel.dto';
 import * as path from 'path';
-import { NovelImportService } from '@/modules/jobs/services/novel-import.service';
 import { JobsService } from '@/modules/jobs/jobs.service';
 import { UpdateJobStatusDto } from '@/modules/jobs/dto/update-status.dto';
 import { Lang } from '@/common/constants/lang.constant';
-import { InternalToken } from '@/modules/auth/decorators/internal-token.decorator';
 import { InternalTokenGuard } from '@/modules/auth/guards/internal-token.guard';
 
 @ApiTags('Jobs')
