@@ -58,7 +58,7 @@ export class JobsController {
   })
   previewImportedNovel(
     @UploadedFile() file: Express.Multer.File,
-    @Body('formatId') formatId?: string
+    @Body() dto: ImportNovelDto
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
@@ -70,7 +70,11 @@ export class JobsController {
       throw new BadRequestException('Only plain text (.txt) files are allowed');
     }
 
-    return this.jobsService.previewNovelImport(file, formatId, 10);
+    return this.jobsService.previewNovelImport(
+      file,
+      dto.formatId,
+      dto.chapterLimit
+    );
   }
 
   @Post('process-novel/:novelId')

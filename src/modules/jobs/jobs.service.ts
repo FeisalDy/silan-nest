@@ -290,9 +290,9 @@ export class JobsService {
     formatId?: string,
     chapterLimit?: number
   ) {
-    // Limit the filesize to 256kb for format detection, so instead of O(file-size),
+    // Limit the filesize to 64kb for format detection, so instead of O(file-size),
     // its O(256kb) which is much faster for large files and still enough for format detection
-    const sample = file.buffer.subarray(0, 256_000).toString('utf8');
+    const sample = file.buffer.subarray(0, 64_000).toString('utf8');
 
     const parser = formatId
       ? this.parserRegistry.getByFormatId(formatId)

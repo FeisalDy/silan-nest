@@ -1,18 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { SfacgMetaChapterV1Parser } from '@/modules/novels/parsers/sfacg-meta-chapter-v1.parser';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { NovelParser } from '../interfaces/parsed-novel.interface';
-import { GenericCnChapterV1Parser } from '@/modules/novels/parsers/generic-cn-chapter-v1.parser';
+import { NOVEL_PARSERS } from './parser.tokens';
 
 @Injectable()
 export class NovelParserRegistry {
-  private readonly parsers: NovelParser[];
-
-  constructor(
-    private readonly genericCnChapterV1Parser: GenericCnChapterV1Parser,
-    private readonly sfacgMetaChapterV1Parser: SfacgMetaChapterV1Parser
-  ) {
-    this.parsers = [genericCnChapterV1Parser, sfacgMetaChapterV1Parser];
-  }
+  constructor(@Inject(NOVEL_PARSERS) private readonly parsers: NovelParser[]) {}
 
   getByFormatId(formatId: string): NovelParser {
     if (!formatId) {
