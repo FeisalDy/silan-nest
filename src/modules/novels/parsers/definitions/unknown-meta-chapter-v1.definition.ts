@@ -15,20 +15,51 @@ const SYNOPSIS_START_RE = /^[\s\u3000]*简介[：:]\s*(.*)$/m;
 const SYNOPSIS_END_RE = /^[\s\u3000]*\S+\s*-\s*\S+/m;
 const CHAPTER_HEADING_RE = /^[\s\u3000]*(\d+)\s*-\s*(.+)$/m;
 
+const stripReminderLine = (raw: string): string => {
+  const lines = raw.split(/\r?\n/);
+  const trimmedFirst = lines[0]?.replace(/^[\s\u3000]+|[\s\u3000]+$/g, '');
+
+  if (trimmedFirst && /^（提醒[:：]/.test(trimmedFirst)) {
+    return lines.slice(1).join('\n');
+  }
+
+  return raw;
+};
+
 const extractTitle = (text: string): string | null => {
   const lines = text.split(/\r?\n/);
 
-  for (const line of lines) {
-    const trimmed = line.replace(/^[\s\u3000]+|[\s\u3000]+$/g, '');
-    if (trimmed) {
-      return trimmed;
+  let authorIndex = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (/^[\s\u3000]*作者[：:]/.test(lines[i])) {
+      authorIndex = i;
+      break;
     }
+  }
+
+  if (authorIndex <= 0) {
+    return null;
+  }
+
+  for (let i = authorIndex - 1; i >= 0; i--) {
+    const trimmed = lines[i].replace(/^[\s\u3000]+|[\s\u3000]+$/g, '');
+
+    if (!trimmed) {
+      continue;
+    }
+
+    if (/^(作者|简介)[：:]/.test(trimmed)) {
+      continue;
+    }
+
+    return trimmed;
   }
 
   return null;
 };
 
-const pickPrefaceTitle = (metadata: ParsedNovelMetadata) => metadata.title;
+const pickPrefaceTitle = (metaData: ParsedNovelMetadata) => metaData.title;
 
 export const unknownMetaChapterV1Definition: ParserDefinition = {
   formatId: FORMAT_ID,
@@ -58,7 +89,7 @@ export const unknownMetaChapterV1Definition: ParserDefinition = {
 
     const title = extractTitle(text);
     if (title) {
-      score += 5;
+      score += 1;
     }
 
     logger.log(`${FORMAT_ID} score: ${score}`);
@@ -79,26 +110,7 @@ export const unknownMetaChapterV1Definition: ParserDefinition = {
       start: SYNOPSIS_START_RE,
       end: SYNOPSIS_END_RE,
       includeStartCapture: true,
-      transform: (value: string) => {
-        const lines = value.split(/\r?\n/);
-
-        const filteredLines = lines
-          .map((line) => {
-            if (/[\s\u3000]*简介[：:]/.test(line)) {
-              return line.replace(/[\s\u3000]*简介[：:]\s*/, '').trim();
-            }
-            return line;
-          })
-          .filter((line) => {
-            const trimmed = line.trim();
-            if (!trimmed) return false;
-            if (/^[（(]提醒：本书超慢热/.test(trimmed)) return false;
-            return true;
-          });
-
-        // Pass our cleanly filtered array strings back to your reusable utility
-        return normalizeSynopsis(filteredLines.join('\n'));
-      },
+      transform: (raw) => normalizeSynopsis(stripReminderLine(raw)),
     },
   },
   chapter: {

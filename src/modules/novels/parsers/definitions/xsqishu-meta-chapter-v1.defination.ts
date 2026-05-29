@@ -20,23 +20,32 @@ const CHAPTER_HEADING_RE =
 const extractTitle = (text: string): string | null => {
   const lines = text.split(/\r?\n/);
 
-  for (const raw of lines) {
-    const line = raw.trim();
+  const authorIndex = lines.findIndex((line) => AUTHOR_RE.test(line.trim()));
+
+  if (authorIndex <= 0) {
+    return null;
+  }
+
+  for (let i = authorIndex - 1; i >= 0; i--) {
+    const line = lines[i].trim();
 
     if (!line) continue;
 
-    // skip separators
+    // separators
     if (/^=+$/.test(line)) continue;
 
-    // skip ads/links
+    // ads / links
     if (line.includes('http://')) continue;
     if (line.includes('https://')) continue;
     if (line.includes('更多精校小说')) continue;
 
-    // skip metadata
+    // accidental metadata
     if (line.startsWith('作者')) continue;
     if (line.startsWith('分类')) continue;
     if (line.startsWith('内容简介')) continue;
+
+    // chapter heading safeguard
+    if (CHAPTER_HEADING_RE.test(line)) continue;
 
     return line;
   }
@@ -77,7 +86,7 @@ export const xsqishuMetaChapterV1Definition: ParserDefinition = {
 
     const title = extractTitle(text);
     if (title && !title.includes('：')) {
-      score += 10;
+      score += 1;
     }
     logger.log(`${FORMAT_ID} score: ${score}`);
 

@@ -27,6 +27,23 @@ const cases: ParserTestCase[] = [
     },
   },
   {
+    formatId: 'generic-cn-chapter-v2',
+    fixture: 'generic-cn-chapter-v2.fixture.txt',
+    assert: (result) => {
+      expect(result.chapters).toHaveLength(3);
+      expect(result.chapters[0]).toMatchObject({
+        chapterNumber: 1,
+        volumeNumber: 1,
+        title: '序章、仙约',
+      });
+      expect(result.chapters[1]).toMatchObject({
+        chapterNumber: 2,
+        volumeNumber: 1,
+        title: '第一章、穿越，然后遇见二十一（１）',
+      });
+    },
+  },
+  {
     formatId: 'sfacg-meta-chapter-v1',
     fixture: 'sfacg-meta-chapter-v1.fixture.txt',
     assert: (result) => {
@@ -67,6 +84,7 @@ const cases: ParserTestCase[] = [
         chapterNumber: 1,
         volumeNumber: 0,
         title: '当成为小姐姐之后',
+        // title: '新年番外-神明的馈赠',
       });
       expect(result.chapters[1]).toMatchObject({
         chapterNumber: 1,

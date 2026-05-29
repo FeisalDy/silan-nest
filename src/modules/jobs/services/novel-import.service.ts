@@ -13,6 +13,7 @@ import { Author } from '@/modules/novels/entities/author.entity';
 import { AuthorTranslation } from '@/modules/novels/entities/author-translation.entity';
 
 import { BuildSlug } from '@/common/utils/build-novel-slug.util';
+import { BuildChunkedChapterParts } from '@/common/utils/chapter-content-chunker.util';
 
 @Injectable()
 export class NovelImportService {
@@ -52,26 +53,35 @@ export class NovelImportService {
       );
 
       for (const parsedChapter of parsedNovel.chapters) {
-        const chapter = await manager.save(
-          Chapter,
-          manager.create(Chapter, {
-            novelId: savedNovel.id,
-            chapterNumber: parsedChapter.chapterNumber,
-            chapterSubNumber: parsedChapter.chapterSubNumber,
-            volumeNumber: parsedChapter.volumeNumber,
-          })
-        );
+        const parts = BuildChunkedChapterParts({
+          title: parsedChapter.title || null,
+          content: parsedChapter.content,
+          baseSubNumber: parsedChapter.chapterSubNumber,
+          options: { maxLength: 20000, breakBuffer: 2000 },
+        });
 
-        await manager.save(
-          ChapterTranslation,
-          manager.create(ChapterTranslation, {
-            chapterId: chapter.id,
-            languageCode: parsedNovel.languageCode,
-            title: parsedChapter.title || null,
-            content: parsedChapter.content,
-            isDefault: true,
-          })
-        );
+        for (const part of parts) {
+          const chapter = await manager.save(
+            Chapter,
+            manager.create(Chapter, {
+              novelId: savedNovel.id,
+              chapterNumber: parsedChapter.chapterNumber,
+              chapterSubNumber: part.chapterSubNumber,
+              volumeNumber: parsedChapter.volumeNumber,
+            })
+          );
+
+          await manager.save(
+            ChapterTranslation,
+            manager.create(ChapterTranslation, {
+              chapterId: chapter.id,
+              languageCode: parsedNovel.languageCode,
+              title: part.title,
+              content: part.content,
+              isDefault: true,
+            })
+          );
+        }
       }
 
       return savedNovel;

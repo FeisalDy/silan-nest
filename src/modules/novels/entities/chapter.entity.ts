@@ -40,7 +40,7 @@ export class Chapter {
 
   @OneToMany(
     () => ChapterTranslation,
-    (translation: ChapterTranslation) => translation.chapter,
+    (translation: ChapterTranslation) => translation.chapter
   )
   translations: ChapterTranslation[];
 }
