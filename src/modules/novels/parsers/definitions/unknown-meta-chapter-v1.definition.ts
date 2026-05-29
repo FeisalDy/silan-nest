@@ -5,6 +5,10 @@ import {
 } from '../engine/parser-definition';
 import { normalizeSynopsis } from '@/modules/novels/parsers/engine/synopsis-normalize.util';
 import { RegexUtils } from '../engine/regex-utils';
+import { Logger } from '@nestjs/common';
+
+const FORMAT_ID = 'unknown-meta-chapter-v1';
+const logger = new Logger(FORMAT_ID);
 
 const AUTHOR_RE = /^[\s\u3000]*作者[：:]\s*(.+)$/m;
 const SYNOPSIS_START_RE = /^[\s\u3000]*简介[：:]\s*(.*)$/m;
@@ -27,7 +31,7 @@ const extractTitle = (text: string): string | null => {
 const pickPrefaceTitle = (metadata: ParsedNovelMetadata) => metadata.title;
 
 export const unknownMetaChapterV1Definition: ParserDefinition = {
-  formatId: 'unknown-meta-chapter-v1',
+  formatId: FORMAT_ID,
   languageCode: Lang.CHINESE_PRC,
   matchScore: (text: string) => {
     let score = 0;
@@ -56,6 +60,8 @@ export const unknownMetaChapterV1Definition: ParserDefinition = {
     if (title) {
       score += 5;
     }
+
+    logger.log(`${FORMAT_ID} score: ${score}`);
 
     return score;
   },

@@ -11,5 +11,6 @@ export const typeOrmConfig: DataSourceOptions = {
   database: process.env.DB_DATABASE,
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   synchronize: isTruthyEnv(process.env.DB_SYNC),
-  logging: !isTruthyEnv(process.env.PRODUCTION),
+  logging:
+    !isTruthyEnv(process.env.PRODUCTION) && isTruthyEnv(process.env.DB_VERBOSE),
 };

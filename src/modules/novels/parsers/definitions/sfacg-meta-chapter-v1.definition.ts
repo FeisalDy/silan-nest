@@ -1,6 +1,10 @@
 import { Lang } from '@/common/constants/lang.constant';
 import { ParserDefinition } from '../engine/parser-definition';
 import { RegexUtils } from '../engine/regex-utils';
+import { Logger } from '@nestjs/common';
+
+const FORMAT_ID = 'sfacg-meta-chapter-v1';
+const logger = new Logger(FORMAT_ID);
 
 const TITLE_RE = /^书籍名称：(.+)$/m;
 const AUTHOR_RE = /^作者名称：(.+)$/m;
@@ -18,7 +22,7 @@ const mapStatus = (status: string | null) => {
 };
 
 export const sfacgMetaChapterV1Definition: ParserDefinition = {
-  formatId: 'sfacg-meta-chapter-v1',
+  formatId: FORMAT_ID,
   languageCode: Lang.CHINESE_PRC,
   matchScore: (text: string) => {
     let score = 0;
@@ -46,6 +50,8 @@ export const sfacgMetaChapterV1Definition: ParserDefinition = {
     if (hasNovelNumber && hasWordCount && hasAuthorTags && hasTitle) {
       score += 50;
     }
+
+    logger.log(`${FORMAT_ID} score: ${score}`);
 
     return score;
   },

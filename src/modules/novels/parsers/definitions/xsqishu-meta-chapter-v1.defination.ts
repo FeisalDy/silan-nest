@@ -3,6 +3,11 @@ import { Lang } from '@/common/constants/lang.constant';
 import { parseChineseChapterNumber } from '@/modules/novels/parsers/engine/chapter-number.util';
 import { normalizeSynopsis } from '@/modules/novels/parsers/engine/synopsis-normalize.util';
 import { RegexUtils } from '@/modules/novels/parsers/engine/regex-utils';
+import { Logger } from '@nestjs/common';
+
+const FORMAT_ID = 'xsqishu-meta-chapter-v1';
+const logger = new Logger(FORMAT_ID);
+
 const AUTHOR_RE = /^作者[：:][ \t]*(.+)$/m;
 
 const CATEGORY_RE = /^分类[：:][ \t]*(.+)$/m;
@@ -40,7 +45,7 @@ const extractTitle = (text: string): string | null => {
 };
 
 export const xsqishuMetaChapterV1Definition: ParserDefinition = {
-  formatId: 'xsqishu-meta-chapter-v1',
+  formatId: FORMAT_ID,
   languageCode: Lang.CHINESE_PRC,
   matchScore: (text: string) => {
     let score = 0;
@@ -72,8 +77,9 @@ export const xsqishuMetaChapterV1Definition: ParserDefinition = {
 
     const title = extractTitle(text);
     if (title && !title.includes('：')) {
-      score += 5;
+      score += 10;
     }
+    logger.log(`${FORMAT_ID} score: ${score}`);
 
     return score;
   },
