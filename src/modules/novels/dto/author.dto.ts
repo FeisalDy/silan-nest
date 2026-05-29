@@ -5,7 +5,7 @@ export class AuthorDto {
   id: string;
 
   @ApiProperty()
-  name: string;
+  name: string | null;
 
   @ApiProperty()
   photoUrl: string | null;

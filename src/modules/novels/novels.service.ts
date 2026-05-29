@@ -367,9 +367,9 @@ export class NovelsService {
       author: novel.author
         ? {
             id: novel.author.id,
-            name: authTrans?.name ?? 'Unknown Author',
+            name: authTrans?.name ?? null,
             photoUrl: novel.author.photoUrl ?? null,
-            biography: authTrans?.biography ?? '',
+            biography: authTrans?.biography ?? null,
           }
         : null,
     };
