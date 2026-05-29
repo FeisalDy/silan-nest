@@ -27,6 +27,7 @@ import {
   NovelIndexJobPayload,
 } from '@/infrastructure/bullmq/queues/novel-index.queue';
 import { JobFlowFactory } from '@/modules/jobs/factories/job-flow.factory';
+import { TextDecoderUtil } from '@/common/utils/text-decoder.util';
 
 @Injectable()
 export class JobsService {
@@ -58,8 +59,11 @@ export class JobsService {
     );
 
     if (!parsedNovel.title) {
+      const cleanFileName = Buffer.from(file.originalname, 'latin1').toString(
+        'utf8'
+      );
       parsedNovel.title = NovelTitleGenerator.generate({
-        fileName: file.originalname,
+        fileName: cleanFileName,
         firstChapterTitle: parsedNovel.chapters[0]?.title,
         languageCode: parsedNovel.languageCode,
       });
@@ -292,13 +296,13 @@ export class JobsService {
   ) {
     // Limit the filesize to 64kb for format detection, so instead of O(file-size),
     // its O(256kb) which is much faster for large files and still enough for format detection
-    const sample = file.buffer.subarray(0, 64_000).toString('utf8');
+    const sample = TextDecoderUtil.decode(file.buffer.subarray(0, 64_000));
 
     const parser = formatId
       ? this.parserRegistry.getByFormatId(formatId)
       : this.parserRegistry.detect(sample);
 
-    const fullText = file.buffer.toString('utf8');
+    const fullText = TextDecoderUtil.decode(file.buffer);
 
     return {
       formatId: parser.formatId,

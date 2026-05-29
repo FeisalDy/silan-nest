@@ -1,10 +1,14 @@
 import { Lang } from '@/common/constants/lang.constant';
 import { ParserDefinition } from '../engine/parser-definition';
+import { RegexUtils } from '../engine/regex-utils';
 
 const TITLE_RE = /^书籍名称：(.+)$/m;
 const AUTHOR_RE = /^作者名称：(.+)$/m;
 const STATUS_RE = /^是否完结：(.+)$/m;
 const CHAPTER_HEADING_RE = /^第\s*(\d+)\s*章\s*(.+)$/m;
+const NOVEL_NUMBER_RE = /^小说序号：(.+)$/m;
+const NOVEL_WORD_COUNT_RE = /^小说字数：(.+)$/m;
+const AUTHOR_TAGS_RE = /^作者标签：(.+)$/m;
 
 const mapStatus = (status: string | null) => {
   if (!status) return null;
@@ -19,20 +23,28 @@ export const sfacgMetaChapterV1Definition: ParserDefinition = {
   matchScore: (text: string) => {
     let score = 0;
 
-    if (TITLE_RE.test(text)) {
-      score += 15;
-    }
+    const hasTitle = RegexUtils.safeTest(TITLE_RE, text);
+    const hasAuthor = RegexUtils.safeTest(AUTHOR_RE, text);
+    const hasStatus = RegexUtils.safeTest(STATUS_RE, text);
+    const hasChapterHeading = RegexUtils.safeTest(CHAPTER_HEADING_RE, text);
 
-    if (AUTHOR_RE.test(text)) {
-      score += 20;
-    }
+    const hasNovelNumber = RegexUtils.safeTest(NOVEL_NUMBER_RE, text);
+    const hasWordCount = RegexUtils.safeTest(NOVEL_WORD_COUNT_RE, text);
+    const hasAuthorTags = RegexUtils.safeTest(AUTHOR_TAGS_RE, text);
 
-    if (STATUS_RE.test(text)) {
-      score += 25;
-    }
+    if (hasTitle) score += 15;
+    if (hasAuthor) score += 15;
+    if (hasStatus) score += 15;
+    if (hasChapterHeading) score += 25;
 
-    if (CHAPTER_HEADING_RE.test(text)) {
-      score += 40;
+    if (hasNovelNumber) score += 15;
+    if (hasWordCount) score += 15;
+    if (hasAuthorTags) score += 15;
+
+    // If it contains the exact watermark keywords of the pack aggregator,
+    // explicitly hand it an unbeatable scoring weight bonus.
+    if (hasNovelNumber && hasWordCount && hasAuthorTags && hasTitle) {
+      score += 50;
     }
 
     return score;
@@ -65,4 +77,3 @@ export const sfacgMetaChapterV1Definition: ParserDefinition = {
     },
   },
 };
-

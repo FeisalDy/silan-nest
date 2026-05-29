@@ -37,6 +37,8 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
+    "iconv-lite": "^0.7.2",
+    "jschardet": "^3.1.4",
     "pg": "^8.20.0",
     "pinyin": "^4.0.0",
     "reflect-metadata": "^0.2.2",

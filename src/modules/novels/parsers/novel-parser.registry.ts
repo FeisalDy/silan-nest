@@ -43,6 +43,10 @@ export class NovelParserRegistry {
 
     const top = matches[0];
 
+    console.log(
+      matches.map((m) => `${m.parser.formatId}: ${m.score}`).join('\n')
+    );
+
     if (matches.length > 1 && top.score === matches[1].score) {
       throw new BadRequestException(
         `Ambiguous novel format. Matches: ${matches
