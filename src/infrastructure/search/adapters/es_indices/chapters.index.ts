@@ -17,6 +17,15 @@ export const chapterIndexSettings: estypes.IndicesCreateRequest = {
 
       content: {
         type: 'text',
+        analyzer: 'standard',
+      },
+
+      // Because ik_smart is part of a community plugin hosted by INFINI Labs (formerly Medcl),
+      // it isn't bundled with native Elasticsearch installations.
+      // You must download the plugin matching your exact Elasticsearch server version.
+      contentZh: {
+        type: 'text',
+        analyzer: 'ik_smart',
       },
 
       languageCode: {

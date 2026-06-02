@@ -28,6 +28,7 @@ import {
 } from '@/infrastructure/bullmq/queues/novel-index.queue';
 import { JobFlowFactory } from '@/modules/jobs/factories/job-flow.factory';
 import { TextDecoderUtil } from '@/common/utils/text-decoder.util';
+import { FilenameUtil } from '@/common/utils/filename.util';
 
 @Injectable()
 export class JobsService {
@@ -59,9 +60,10 @@ export class JobsService {
     );
 
     if (!parsedNovel.title) {
-      const cleanFileName = Buffer.from(file.originalname, 'latin1').toString(
-        'utf8'
-      );
+      const cleanFileName = FilenameUtil.normalize(file.originalname);
+
+      console.log('cleanFileName', cleanFileName);
+
       parsedNovel.title = NovelTitleGenerator.generate({
         fileName: cleanFileName,
         firstChapterTitle: parsedNovel.chapters[0]?.title,
@@ -78,45 +80,109 @@ export class JobsService {
       formatId
     );
 
-    return await this.dataSource.transaction(async (manager) => {
-      const payloadNovel = {
-        ...parsedNovel,
-        chapters: parsedNovel.chapters.slice(0, 2),
-        synopsis:
-          parsedNovel.synopsis && parsedNovel.synopsis.length > 300
-            ? `${parsedNovel.synopsis.substring(0, 300)}...`
-            : parsedNovel.synopsis,
-      };
+    const payloadNovel = {
+      ...parsedNovel,
+      chapters: parsedNovel.chapters.slice(0, 2),
+      synopsis:
+        parsedNovel.synopsis && parsedNovel.synopsis.length > 300
+          ? `${parsedNovel.synopsis.substring(0, 300)}...`
+          : parsedNovel.synopsis,
+    };
 
-      const dbJob = manager.create(Job, {
-        type: JobType.IMPORT_NOVEL,
-        status: JobStatus.WAITING,
-        entityType: JobEntity.NOVEL,
-        payload: {
-          formatId: resolvedFormatId,
-          source: resolvedFormatId,
-          parsedNovel: payloadNovel,
-        },
-        attempts: 0,
-      });
+    const dbImportJob = await this.jobsRepository.save({
+      type: JobType.IMPORT_NOVEL,
+      status: JobStatus.WAITING,
+      entityType: JobEntity.NOVEL,
+      payload: {
+        formatId: resolvedFormatId,
+        source: resolvedFormatId,
+        parsedNovel: payloadNovel,
+      },
+      attempts: 0,
+    });
 
-      const savedDbJob = await manager.save(Job, dbJob);
-
+    try {
       const bullmqJob = await this.novelImportQueue.add(NOVEL_IMPORT_JOB, {
-        dbJobId: savedDbJob.id,
+        dbJobId: dbImportJob.id,
         formatId: resolvedFormatId,
         source: resolvedFormatId,
         parsedNovel,
       });
 
-      savedDbJob.queueJobId = bullmqJob.id;
-      await manager.save(Job, savedDbJob);
+      await this.jobsRepository.update(
+        { id: dbImportJob.id },
+        {
+          queueJobId: String(bullmqJob.id),
+        }
+      );
 
       return {
         status: JobStatus.WAITING,
-        jobId: savedDbJob.id,
+        jobId: dbImportJob.id,
       };
+    } catch (error) {
+      await this.jobsRepository.update(
+        { id: dbImportJob.id },
+        {
+          status: JobStatus.FAILED,
+          failedAt: new Date(),
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }
+      );
+
+      throw error;
+    }
+  }
+
+  async enqueueNovelIndex(novelId: string, lang: Lang) {
+    const novel = await this.novelService.findNovelBySlugOrId(novelId);
+
+    if (!novel) {
+      throw new NotFoundException('Novel not found');
+    }
+
+    const dbIndexJob = await this.jobsRepository.save({
+      type: JobType.INDEX_NOVEL,
+      status: JobStatus.WAITING,
+      entityType: JobEntity.NOVEL,
+      entityId: novelId,
+      payload: {
+        novelId,
+        lang,
+      },
+      attempts: 0,
     });
+
+    try {
+      const bullmqJob = await this.novelIndexQueue.add(NOVEL_INDEX_JOB, {
+        dbJobId: dbIndexJob.id,
+        novelId,
+        lang: lang,
+      });
+
+      await this.jobsRepository.update(
+        { id: dbIndexJob.id },
+        {
+          queueJobId: String(bullmqJob.id),
+        }
+      );
+
+      return {
+        status: JobStatus.WAITING,
+        jobId: dbIndexJob.id,
+      };
+    } catch (error) {
+      await this.jobsRepository.update(
+        { id: dbIndexJob.id },
+        {
+          status: JobStatus.FAILED,
+          failedAt: new Date(),
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }
+      );
+
+      throw error;
+    }
   }
 
   async enqueueNovelProcessing(novelId: string, targetLang: Lang) {
@@ -185,63 +251,79 @@ export class JobsService {
       }
     );
 
-    /**
-     * FLOW:
-     * translation -> indexing
-     */
-    if (translateDbJob && indexDbJob) {
-      const flowConfig = this.flowFactory.createTranslationAndIndexingFlow(
-        translateDbJob,
-        indexDbJob,
-        novelId,
-        targetLang
-      );
+    try {
+      /**
+       * FLOW:
+       * translation -> indexing
+       */
+      if (translateDbJob && indexDbJob) {
+        const flowConfig = this.flowFactory.createTranslationAndIndexingFlow(
+          translateDbJob,
+          indexDbJob,
+          novelId,
+          targetLang
+        );
 
-      const flow = await this.flowProducer.add(flowConfig);
+        const flow = await this.flowProducer.add(flowConfig);
 
-      await this.jobsRepository.update(indexDbJob.id, {
-        queueJobId: flow.job.id,
-      });
+        await this.jobsRepository.update(indexDbJob.id, {
+          queueJobId: String(flow.job.id),
+        });
 
-      const child = flow.children?.[0];
+        const child = flow.children?.[0];
 
-      if (child) {
+        if (child) {
+          await this.jobsRepository.update(translateDbJob.id, {
+            queueJobId: String(child.job.id),
+          });
+        }
+      } else if (translateDbJob) {
+        const bullmqJob = await this.novelTranslateQueue.add(
+          NOVEL_TRANSLATION_JOB,
+          {
+            dbJobId: translateDbJob.id,
+            novelId,
+            targetLang,
+          }
+        );
+
         await this.jobsRepository.update(translateDbJob.id, {
-          queueJobId: child.job.id,
+          queueJobId: String(bullmqJob.id),
+        });
+      } else if (indexDbJob) {
+        const bullmqJob = await this.novelIndexQueue.add(NOVEL_INDEX_JOB, {
+          dbJobId: indexDbJob.id,
+          novelId,
+          lang: targetLang,
+        });
+
+        await this.jobsRepository.update(indexDbJob.id, {
+          queueJobId: String(bullmqJob.id),
         });
       }
-    } else if (translateDbJob) {
-      /**
-       * Translation only
-       */
-      const bullmqJob = await this.novelTranslateQueue.add(
-        NOVEL_TRANSLATION_JOB,
-        {
-          dbJobId: translateDbJob.id,
-          novelId,
-          targetLang,
-        }
-      );
 
-      await this.jobsRepository.update(translateDbJob.id, {
-        queueJobId: bullmqJob.id,
-      });
-    } else if (indexDbJob) {
-      const bullmqJob = await this.novelIndexQueue.add(NOVEL_INDEX_JOB, {
-        dbJobId: indexDbJob.id,
-        novelId,
-      });
+      return {
+        status: JobStatus.WAITING,
+        translateJobId: translateDbJob?.id,
+        indexJobId: indexDbJob?.id,
+      };
+    } catch (error) {
+      const failedUpdate = {
+        status: JobStatus.FAILED,
+        failedAt: new Date(),
+        errorMessage: error instanceof Error ? error.message : String(error),
+      };
 
-      await this.jobsRepository.update(indexDbJob.id, {
-        queueJobId: bullmqJob.id,
-      });
+      if (translateDbJob) {
+        await this.jobsRepository.update(translateDbJob.id, failedUpdate);
+      }
+
+      if (indexDbJob) {
+        await this.jobsRepository.update(indexDbJob.id, failedUpdate);
+      }
+
+      throw error;
     }
-
-    return {
-      status: JobStatus.WAITING,
-      translateJobId: translateDbJob?.id,
-      indexJobId: indexDbJob?.id,
-    };
   }
 
   async getJob(jobId: string) {

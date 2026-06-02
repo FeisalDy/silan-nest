@@ -77,6 +77,22 @@ export class JobsController {
     );
   }
 
+  @Post('index-novel/:novelId')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['lang'],
+      properties: {
+        lang: {
+          type: 'string',
+          description: 'Which language you want to index (e.g, en, id)',
+        },
+      },
+    },
+  })
+  indexNovel(@Param('novelId') novelId: string, @Body() body: { lang: Lang }) {
+    return this.jobsService.enqueueNovelIndex(novelId, body.lang);
+  }
   @Post('process-novel/:novelId')
   @ApiBody({
     schema: {

@@ -5,7 +5,7 @@ import { SearchService } from './search.service';
 import { ElasticsearchAdapter } from './adapters/elasticsearch.adapter';
 import { NoopSearchAdapter } from '@/infrastructure/search/adapters/noopsearch.adapter';
 import { SEARCH_ADAPTER } from './search.constants';
-import { IndexManagerService } from '@/infrastructure/search/indices/index-manager.service';
+import { IndexManagerService } from '@/infrastructure/search/adapters/es_indices/index-manager.service';
 import { ConfigService } from '@nestjs/config';
 import { isTruthyEnv } from '@/common/utils/is-truthy-env.util';
 
@@ -47,8 +47,7 @@ export class SearchModule {
             real: ElasticsearchAdapter,
             dummy: NoopSearchAdapter
           ) => {
-            const enabled =
-              isTruthyEnv(config.get('ELASTICSEARCH_ENABLED'));
+            const enabled = isTruthyEnv(config.get('ELASTICSEARCH_ENABLED'));
             return enabled ? real : dummy;
           },
         },

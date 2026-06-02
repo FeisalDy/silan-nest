@@ -7,7 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { Role } from '../../../common/constants/role.constant';
+import { Role } from '@/common/constants/role.constant';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -37,7 +37,7 @@ export class RolesGuard implements CanActivate {
 
     if (!requiredRoles.includes(user.role)) {
       throw new ForbiddenException(
-        'You do not have permission for this action',
+        'You do not have permission for this action'
       );
     }
 

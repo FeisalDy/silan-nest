@@ -25,7 +25,11 @@ export class JobFlowFactory {
     return {
       name: NOVEL_INDEX_JOB,
       queueName: NOVEL_INDEX_QUEUE,
-      data: { dbJobId: indexJob.id, novelId } satisfies IndexFlowParent,
+      data: {
+        dbJobId: indexJob.id,
+        novelId,
+        lang: targetLang,
+      } satisfies IndexFlowParent,
       children: [
         {
           name: NOVEL_TRANSLATION_JOB,

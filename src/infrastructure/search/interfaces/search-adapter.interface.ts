@@ -7,11 +7,11 @@ export interface SearchHit<T> {
 
 export interface SearchBulkDocument {
   id: string;
-  document: unknown;
+  document: Record<string, unknown>;
+  languageCode?: string;
 }
 
 export interface SearchAdapter {
-
   bulkIndex(index: string, documents: SearchBulkDocument[]): Promise<void>;
 
   search<T>(index: string, query: unknown): Promise<SearchHit<T>[]>;

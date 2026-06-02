@@ -17,7 +17,7 @@ export class NovelIndexProcessor extends WorkerHost {
   }
 
   async process(job: Job<NovelIndexJobPayload>) {
-    await this.novelIndexService.execute(job.data.novelId);
+    await this.novelIndexService.execute(job.data);
   }
 
   @OnWorkerEvent('active')
