@@ -5,6 +5,7 @@ import {
 } from '../engine/parser-definition';
 import { normalizeSynopsis } from '@/modules/novels/parsers/engine/synopsis-normalize.util';
 import { RegexUtils } from '../engine/regex-utils';
+import { scoreWith } from '../engine/scoring.util';
 import { Logger } from '@nestjs/common';
 
 const FORMAT_ID = 'unknown-meta-chapter-v1';
@@ -65,32 +66,20 @@ export const unknownMetaChapterV1Definition: ParserDefinition = {
   formatId: FORMAT_ID,
   languageCode: Lang.CHINESE_PRC,
   matchScore: (text: string) => {
-    let score = 0;
-
     const hasAuthor = RegexUtils.safeTest(AUTHOR_RE, text);
     const hasSynopsis = RegexUtils.safeTest(SYNOPSIS_START_RE, text);
     const hasChapterHeading = RegexUtils.safeTest(CHAPTER_HEADING_RE, text);
 
-    if (hasAuthor) {
-      score += 10;
-    }
-
-    if (hasSynopsis) {
-      score += 10;
-    }
-
-    if (hasChapterHeading) {
-      score += 35;
-    }
-
-    if (hasAuthor && hasSynopsis && hasChapterHeading) {
-      score += 25;
-    }
-
     const title = extractTitle(text);
-    if (title) {
-      score += 1;
-    }
+
+    const score = scoreWith((scorer) => {
+      scorer
+        .addIf(hasAuthor, 10)
+        .addIf(hasSynopsis, 10)
+        .addIf(hasChapterHeading, 35)
+        .addIfAll([hasAuthor, hasSynopsis, hasChapterHeading], 25)
+        .addIf(Boolean(title), 1);
+    });
 
     logger.log(`${FORMAT_ID} score: ${score}`);
 

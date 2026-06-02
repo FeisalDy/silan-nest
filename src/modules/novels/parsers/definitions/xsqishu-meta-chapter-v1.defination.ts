@@ -3,6 +3,7 @@ import { Lang } from '@/common/constants/lang.constant';
 import { parseChineseChapterNumber } from '@/modules/novels/parsers/engine/chapter-number.util';
 import { normalizeSynopsis } from '@/modules/novels/parsers/engine/synopsis-normalize.util';
 import { RegexUtils } from '@/modules/novels/parsers/engine/regex-utils';
+import { scoreWith } from '@/modules/novels/parsers/engine/scoring.util';
 import { Logger } from '@nestjs/common';
 
 const FORMAT_ID = 'xsqishu-meta-chapter-v1';
@@ -57,37 +58,22 @@ export const xsqishuMetaChapterV1Definition: ParserDefinition = {
   formatId: FORMAT_ID,
   languageCode: Lang.CHINESE_PRC,
   matchScore: (text: string) => {
-    let score = 0;
-
     const hasAuthor = RegexUtils.safeTest(AUTHOR_RE, text);
     const hasCategory = RegexUtils.safeTest(CATEGORY_RE, text);
     const hasSynopsis = RegexUtils.safeTest(SYNOPSIS_START_RE, text);
     const hasChapterHeading = RegexUtils.safeTest(CHAPTER_HEADING_RE, text);
 
-    if (hasAuthor) {
-      score += 15;
-    }
-
-    if (hasCategory) {
-      score += 25;
-    }
-
-    if (hasSynopsis) {
-      score += 25;
-    }
-
-    if (hasChapterHeading) {
-      score += 20;
-    }
-
-    if (hasAuthor && hasCategory && hasSynopsis && hasChapterHeading) {
-      score += 25;
-    }
-
     const title = extractTitle(text);
-    if (title && !title.includes('：')) {
-      score += 1;
-    }
+
+    const score = scoreWith((scorer) => {
+      scorer
+        .addIf(hasAuthor, 15)
+        .addIf(hasCategory, 25)
+        .addIf(hasSynopsis, 25)
+        .addIf(hasChapterHeading, 20)
+        .addIfAll([hasAuthor, hasCategory, hasSynopsis, hasChapterHeading], 25)
+        .addIf(Boolean(title && !title.includes('：')), 1);
+    });
     logger.log(`${FORMAT_ID} score: ${score}`);
 
     return score;
