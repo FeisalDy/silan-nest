@@ -16,13 +16,18 @@ import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from '@/modules/auth/decorators/roles.decorator';
 import { Role } from '@/common/constants/role.constant';
-import { ImportNovelDto } from '@/modules/jobs/dto/Import-novel.dto';
+import {
+  BulkImportNovelDto,
+  ImportNovelDto,
+} from '@/modules/jobs/dto/Import-novel.dto';
 import * as path from 'path';
 import { JobsService } from '@/modules/jobs/jobs.service';
 import { UpdateJobStatusDto } from '@/modules/jobs/dto/update-status.dto';
 import { Lang } from '@/common/constants/lang.constant';
 import { InternalTokenGuard } from '@/modules/auth/guards/internal-token.guard';
+import { Public } from '@/modules/auth/decorators/public.decorator';
 
+@Roles(Role.EDITOR)
 @ApiTags('Jobs')
 @Controller('jobs')
 export class JobsController {
@@ -49,7 +54,6 @@ export class JobsController {
   }
 
   @Post('import-novel/preview')
-  @Roles(Role.EDITOR)
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
@@ -77,6 +81,20 @@ export class JobsController {
     );
   }
 
+  @Post('import-novel/bulk')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    type: BulkImportNovelDto,
+  })
+  bulkImportNovel(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    return this.jobsService.enqueueBulkNovelImport(file);
+  }
   @Post('index-novel/:novelId')
   @ApiBody({
     schema: {
@@ -123,6 +141,10 @@ export class JobsController {
   }
 
   @Patch(':jobId/status')
+  @ApiBody({
+    type: UpdateJobStatusDto,
+  })
+  @Public()
   @UseGuards(InternalTokenGuard)
   async updateStatus(
     @Param('jobId') jobId: string,

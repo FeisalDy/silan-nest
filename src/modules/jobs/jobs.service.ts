@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectFlowProducer, InjectQueue } from '@nestjs/bullmq';
 import {
   NOVEL_IMPORT_JOB,
@@ -29,6 +33,9 @@ import {
 import { JobFlowFactory } from '@/modules/jobs/factories/job-flow.factory';
 import { TextDecoderUtil } from '@/common/utils/text-decoder.util';
 import { FilenameUtil } from '@/common/utils/filename.util';
+import { BuildSlug } from '@/common/utils/build-novel-slug.util';
+import { StorageService } from '@/infrastructure/storage/storage.service';
+import { StorageKeys } from '@/infrastructure/storage/helpers/storage-key.helper';
 
 @Injectable()
 export class JobsService {
@@ -45,7 +52,8 @@ export class JobsService {
     private readonly parserRegistry: NovelParserRegistry,
     private readonly dataSource: DataSource,
     private readonly novelService: NovelsService,
-    private readonly flowFactory: JobFlowFactory
+    private readonly flowFactory: JobFlowFactory,
+    private readonly storageService: StorageService
   ) {}
 
   previewNovelImport(
@@ -62,8 +70,6 @@ export class JobsService {
     if (!parsedNovel.title) {
       const cleanFileName = FilenameUtil.normalize(file.originalname);
 
-      console.log('cleanFileName', cleanFileName);
-
       parsedNovel.title = NovelTitleGenerator.generate({
         fileName: cleanFileName,
         firstChapterTitle: parsedNovel.chapters[0]?.title,
@@ -79,6 +85,17 @@ export class JobsService {
       file,
       formatId
     );
+
+    const slug = parsedNovel?.title ? BuildSlug(parsedNovel.title) : undefined;
+    if (slug) {
+      const novelExist = await this.novelService.findNovelBySlugOrId(slug);
+
+      if (novelExist) {
+        throw new ConflictException(
+          `Novel "${parsedNovel.title}" already exists`
+        );
+      }
+    }
 
     const payloadNovel = {
       ...parsedNovel,
@@ -134,6 +151,17 @@ export class JobsService {
     }
   }
 
+  async enqueueBulkNovelImport(file: Express.Multer.File) {
+    const jobIdPlaceholder = 'sadsadsad';
+    const key = await this.storageService.upload(
+      StorageKeys.importArchive(
+        jobIdPlaceholder,
+        FilenameUtil.normalize(file.originalname)
+      ),
+      file.buffer
+    );
+    return key;
+  }
   async enqueueNovelIndex(novelId: string, lang: Lang) {
     const novel = await this.novelService.findNovelBySlugOrId(novelId);
 

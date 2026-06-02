@@ -4,7 +4,7 @@ import { ElasticsearchModule } from '@nestjs/elasticsearch';
 import { SearchService } from './search.service';
 import { ElasticsearchAdapter } from './adapters/elasticsearch.adapter';
 import { NoopSearchAdapter } from '@/infrastructure/search/adapters/noopsearch.adapter';
-import { SEARCH_ADAPTER } from './search.constants';
+import { SEARCH_ADAPTER } from './search.tokens';
 import { IndexManagerService } from '@/infrastructure/search/adapters/es_indices/index-manager.service';
 import { ConfigService } from '@nestjs/config';
 import { isTruthyEnv } from '@/common/utils/is-truthy-env.util';

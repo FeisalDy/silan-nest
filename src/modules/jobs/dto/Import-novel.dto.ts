@@ -31,3 +31,12 @@ export class ImportNovelDto {
   @Max(20)
   chapterLimit?: number = 10;
 }
+
+export class BulkImportNovelDto {
+  @ApiProperty({
+    type: 'string',
+    format: 'binary',
+    description: 'Zip file containing multiple novel .txt files',
+  })
+  file: any;
+}

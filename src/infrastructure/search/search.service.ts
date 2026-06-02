@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SEARCH_ADAPTER } from './search.constants';
+import { SEARCH_ADAPTER } from './search.tokens';
 import {
   type SearchAdapter,
   SearchBulkDocument,

@@ -10,12 +10,14 @@ import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import type { Request } from 'express';
 import { LoginDto } from './dto/login.dto';
+import { Public } from '@/modules/auth/decorators/public.decorator';
 
+@Public()
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly authService: AuthService,
+    private readonly authService: AuthService
   ) {}
 
   @Post('register')

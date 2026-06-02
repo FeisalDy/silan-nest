@@ -11,6 +11,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { JobsModule } from '@/modules/jobs/jobs.module';
+import { StorageModule } from '@/infrastructure/storage/storage.module';
 
 @Module({
   imports: [
@@ -18,13 +19,14 @@ import { JobsModule } from '@/modules/jobs/jobs.module';
       isGlobal: true,
     }),
     ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
+      rootPath: join(process.cwd(), 'storage'),
+      serveRoot: '/storage',
       serveStaticOptions: {
         index: false,
       },
     }),
     BullmqInfrastructureModule,
+    StorageModule,
     DatabaseModule,
     AuthModule,
     UsersModule,
