@@ -11,6 +11,9 @@ import { JobFlowFactory } from '@/modules/jobs/factories/job-flow.factory';
 import { NovelIndexService } from '@/modules/jobs/services/novel-index.service';
 import { NovelIndexProcessor } from '@/modules/jobs/processors/novel-index.processor';
 import { StorageModule } from '@/infrastructure/storage/storage.module';
+import { NovelBulkImportProcessor } from '@/modules/jobs/processors/novel-bulk-import.processor';
+import { NovelBulkImportService } from '@/modules/jobs/services/novel-bulk-import.service';
+import { NovelParserService } from '@/modules/jobs/services/novel-parser.service';
 
 @Module({
   imports: [
@@ -27,6 +30,9 @@ import { StorageModule } from '@/infrastructure/storage/storage.module';
     JobFlowFactory,
     NovelIndexService,
     NovelIndexProcessor,
+    NovelBulkImportService,
+    NovelBulkImportProcessor,
+    NovelParserService,
   ],
   controllers: [JobsController],
 })

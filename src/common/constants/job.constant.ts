@@ -1,5 +1,6 @@
 export enum JobType {
   IMPORT_NOVEL = 'import_novel',
+  BULK_IMPORT_NOVEL = 'bulk_import_novel',
   TRANSLATE_NOVEL = 'translating_novel',
   INDEX_NOVEL = 'index_novel',
 }

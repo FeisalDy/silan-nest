@@ -5,6 +5,7 @@ import { NOVEL_IMPORT_QUEUE } from './queues/novel-import.queue';
 import { NOVEL_TRANSLATION_QUEUE } from './queues/novel-translation.queue';
 import { NOVEL_INDEX_QUEUE } from './queues/novel-index.queue';
 import { NOVEL_TRANSLATE_AND_INDEX_FLOW } from '@/infrastructure/bullmq/flows/novel-translate-and-index.flow';
+import { NOVEL_BULK_IMPORT_QUEUE } from '@/infrastructure/bullmq/queues/novel_bulk_import.queue';
 
 @Global()
 @Module({
@@ -22,7 +23,8 @@ import { NOVEL_TRANSLATE_AND_INDEX_FLOW } from '@/infrastructure/bullmq/flows/no
     BullModule.registerQueue(
       { name: NOVEL_IMPORT_QUEUE },
       { name: NOVEL_TRANSLATION_QUEUE },
-      { name: NOVEL_INDEX_QUEUE }
+      { name: NOVEL_INDEX_QUEUE },
+      { name: NOVEL_BULK_IMPORT_QUEUE }
     ),
     BullModule.registerFlowProducer({
       name: NOVEL_TRANSLATE_AND_INDEX_FLOW,

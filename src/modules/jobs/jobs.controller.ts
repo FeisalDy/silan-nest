@@ -12,7 +12,7 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from '@/modules/auth/decorators/roles.decorator';
 import { Role } from '@/common/constants/role.constant';
@@ -26,12 +26,18 @@ import { UpdateJobStatusDto } from '@/modules/jobs/dto/update-status.dto';
 import { Lang } from '@/common/constants/lang.constant';
 import { InternalTokenGuard } from '@/modules/auth/guards/internal-token.guard';
 import { Public } from '@/modules/auth/decorators/public.decorator';
+import { ZipValidatorUtil } from '@/common/utils/validate-zip.util';
+import { NovelParserService } from '@/modules/jobs/services/novel-parser.service';
 
 @Roles(Role.EDITOR)
 @ApiTags('Jobs')
+@ApiBearerAuth('access-token')
 @Controller('jobs')
 export class JobsController {
-  constructor(private readonly jobsService: JobsService) {}
+  constructor(
+    private readonly jobsService: JobsService,
+    private readonly novelParserService: NovelParserService
+  ) {}
   @Post('import-novel')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
@@ -74,7 +80,7 @@ export class JobsController {
       throw new BadRequestException('Only plain text (.txt) files are allowed');
     }
 
-    return this.jobsService.previewNovelImport(
+    return this.novelParserService.previewNovelImport(
       file,
       dto.formatId,
       dto.chapterLimit
@@ -83,15 +89,26 @@ export class JobsController {
 
   @Post('import-novel/bulk')
   @HttpCode(HttpStatus.OK)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 100 * 1024 * 1024,
+      },
+    })
+  )
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     type: BulkImportNovelDto,
   })
-  bulkImportNovel(@UploadedFile() file: Express.Multer.File) {
-    if (!file) {
-      throw new BadRequestException('File is required');
-    }
+  async bulkImportNovel(
+    @UploadedFile()
+    file: Express.Multer.File
+  ) {
+    await ZipValidatorUtil.validate(file, {
+      maxFiles: 1000,
+      maxUncompressedSize: 500 * 1024 * 1024,
+      allowedExtensions: ['.txt'],
+    });
 
     return this.jobsService.enqueueBulkNovelImport(file);
   }

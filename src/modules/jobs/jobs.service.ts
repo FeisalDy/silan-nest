@@ -10,8 +10,6 @@ import {
   NovelImportJobPayload,
 } from '@/infrastructure/bullmq/queues/novel-import.queue';
 import { FlowProducer, Queue } from 'bullmq';
-import { NovelParserRegistry } from '@/modules/novels/parsers/novel-parser.registry';
-import { NovelTitleGenerator } from '@/common/utils/novel-title-generator.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job } from '@/modules/jobs/entities/job.entity';
 import { DataSource, Repository } from 'typeorm';
@@ -31,11 +29,15 @@ import {
   NovelIndexJobPayload,
 } from '@/infrastructure/bullmq/queues/novel-index.queue';
 import { JobFlowFactory } from '@/modules/jobs/factories/job-flow.factory';
-import { TextDecoderUtil } from '@/common/utils/text-decoder.util';
 import { FilenameUtil } from '@/common/utils/filename.util';
 import { BuildSlug } from '@/common/utils/build-novel-slug.util';
-import { StorageService } from '@/infrastructure/storage/storage.service';
-import { StorageKeys } from '@/infrastructure/storage/helpers/storage-key.helper';
+import {
+  NOVEL_BULK_IMPORT_QUEUE,
+  NOVEL_BULK_IMPORT_JOB,
+  NovelBulkImportJobPayload,
+} from '@/infrastructure/bullmq/queues/novel_bulk_import.queue';
+import { TemporaryStorageService } from '@/infrastructure/storage/services/temporary-storage.service';
+import { NovelParserService } from '@/modules/jobs/services/novel-parser.service';
 
 @Injectable()
 export class JobsService {
@@ -47,44 +49,20 @@ export class JobsService {
     private readonly novelTranslateQueue: Queue<NovelTranslationJobPayload>,
     @InjectQueue(NOVEL_INDEX_QUEUE)
     private readonly novelIndexQueue: Queue<NovelIndexJobPayload>,
+    @InjectQueue(NOVEL_BULK_IMPORT_QUEUE)
+    private readonly novelBulkImportQueue: Queue<NovelBulkImportJobPayload>,
     @InjectFlowProducer(NOVEL_TRANSLATE_AND_INDEX_FLOW)
     private readonly flowProducer: FlowProducer,
-    private readonly parserRegistry: NovelParserRegistry,
     private readonly dataSource: DataSource,
     private readonly novelService: NovelsService,
     private readonly flowFactory: JobFlowFactory,
-    private readonly storageService: StorageService
+    private readonly tempStorageService: TemporaryStorageService,
+    private readonly novelParserService: NovelParserService
   ) {}
 
-  previewNovelImport(
-    file: Express.Multer.File,
-    formatId?: string,
-    chapterLimit?: number
-  ) {
-    const { parsedNovel, formatId: resolvedFormatId } = this.parseNovel(
-      file,
-      formatId,
-      chapterLimit
-    );
-
-    if (!parsedNovel.title) {
-      const cleanFileName = FilenameUtil.normalize(file.originalname);
-
-      parsedNovel.title = NovelTitleGenerator.generate({
-        fileName: cleanFileName,
-        firstChapterTitle: parsedNovel.chapters[0]?.title,
-        languageCode: parsedNovel.languageCode,
-      });
-    }
-
-    return { parsedNovel, resolvedFormatId };
-  }
-
   async enqueueNovelImport(file: Express.Multer.File, formatId?: string) {
-    const { parsedNovel, resolvedFormatId } = this.previewNovelImport(
-      file,
-      formatId
-    );
+    const { parsedNovel, resolvedFormatId } =
+      this.novelParserService.previewNovelImport(file, formatId);
 
     const slug = parsedNovel?.title ? BuildSlug(parsedNovel.title) : undefined;
     if (slug) {
@@ -152,16 +130,58 @@ export class JobsService {
   }
 
   async enqueueBulkNovelImport(file: Express.Multer.File) {
-    const jobIdPlaceholder = 'sadsadsad';
-    const key = await this.storageService.upload(
-      StorageKeys.importArchive(
-        jobIdPlaceholder,
-        FilenameUtil.normalize(file.originalname)
-      ),
-      file.buffer
-    );
-    return key;
+    const dbBulkImportJob = await this.jobsRepository.save({
+      type: JobType.BULK_IMPORT_NOVEL,
+      status: JobStatus.WAITING,
+      entityType: JobEntity.NOVEL,
+      payload: {},
+      attempts: 0,
+    });
+
+    try {
+      const normalizedFileName = FilenameUtil.normalize(file.originalname);
+      await this.tempStorageService.saveArchive(
+        dbBulkImportJob.id,
+        normalizedFileName,
+        file.buffer
+      );
+
+      const bullmqJob = await this.novelBulkImportQueue.add(
+        NOVEL_BULK_IMPORT_JOB,
+        {
+          dbJobId: dbBulkImportJob.id,
+          fileName: normalizedFileName,
+        }
+      );
+
+      await this.jobsRepository.update(
+        { id: dbBulkImportJob.id },
+        {
+          queueJobId: String(bullmqJob.id),
+          payload: {
+            fileName: normalizedFileName,
+          } as Record<string, any>,
+        }
+      );
+
+      return {
+        status: JobStatus.WAITING,
+        jobId: dbBulkImportJob.id,
+      };
+    } catch (error) {
+      await this.jobsRepository.update(
+        { id: dbBulkImportJob.id },
+        {
+          status: JobStatus.FAILED,
+          failedAt: new Date(),
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }
+      );
+
+      throw error;
+    }
   }
+
   async enqueueNovelIndex(novelId: string, lang: Lang) {
     const novel = await this.novelService.findNovelBySlugOrId(novelId);
 
@@ -397,26 +417,5 @@ export class JobsService {
 
   async updateStatus(jobId: string, payload: UpdateJobStatusDto) {
     await this.jobsRepository.update(jobId, payload);
-  }
-
-  private parseNovel(
-    file: Express.Multer.File,
-    formatId?: string,
-    chapterLimit?: number
-  ) {
-    // Limit the filesize to 64kb for format detection, so instead of O(file-size),
-    // its O(256kb) which is much faster for large files and still enough for format detection
-    const sample = TextDecoderUtil.decode(file.buffer.subarray(0, 64_000));
-
-    const parser = formatId
-      ? this.parserRegistry.getByFormatId(formatId)
-      : this.parserRegistry.detect(sample);
-
-    const fullText = TextDecoderUtil.decode(file.buffer);
-
-    return {
-      formatId: parser.formatId,
-      parsedNovel: parser.parse(fullText, chapterLimit),
-    };
   }
 }

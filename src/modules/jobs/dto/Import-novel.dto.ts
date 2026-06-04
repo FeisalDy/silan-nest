@@ -36,7 +36,7 @@ export class BulkImportNovelDto {
   @ApiProperty({
     type: 'string',
     format: 'binary',
-    description: 'Zip file containing multiple novel .txt files',
+    description: 'ZIP file containing novel text files',
   })
   file: any;
 }
