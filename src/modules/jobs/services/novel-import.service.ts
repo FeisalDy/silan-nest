@@ -1,25 +1,48 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
-import { ParsedNovel } from '@/modules/novels/interfaces/parsed-novel.interface';
-
 import { Novel } from '@/modules/novels/entities/novel.entity';
 import { NovelTranslation } from '@/modules/novels/entities/novel-translation.entity';
-
 import { Chapter } from '@/modules/novels/entities/chapter.entity';
 import { ChapterTranslation } from '@/modules/novels/entities/chapter-translation.entity';
-
 import { Author } from '@/modules/novels/entities/author.entity';
 import { AuthorTranslation } from '@/modules/novels/entities/author-translation.entity';
 
 import { BuildSlug } from '@/common/utils/build-novel-slug.util';
 import { BuildChunkedChapterParts } from '@/common/utils/chapter-content-chunker.util';
 
+import { NovelImportJobPayload } from '@/infrastructure/bullmq/queues/novel-import.queue';
+import { NovelParserService } from '@/modules/jobs/services/novel-parser.service';
+import { StorageService } from '@/infrastructure/storage/storage.service';
+
+export interface NovelImportResult {
+  novelId: string;
+  title: string;
+  chapterCount: number;
+  languageCode: string;
+}
+
 @Injectable()
 export class NovelImportService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly storageService: StorageService,
+    private readonly novelParserService: NovelParserService
+  ) {}
 
-  async execute(parsedNovel: ParsedNovel) {
+  async execute(payload: NovelImportJobPayload): Promise<NovelImportResult> {
+    const buffer = await this.storageService.download(payload.storageKey);
+
+    const multerFile = {
+      originalname: payload.fileName,
+      buffer,
+    } as Express.Multer.File;
+
+    const { parsedNovel } = this.novelParserService.previewNovelImport(
+      multerFile,
+      payload.formatId
+    );
+
     return this.dataSource.transaction(async (manager) => {
       let author: Author | null = null;
 
@@ -31,23 +54,22 @@ export class NovelImportService {
         );
       }
 
-      const novel = manager.create(Novel, {
-        status: parsedNovel.status ?? null,
-        authorId: author?.id ?? null,
-      });
-
-      const savedNovel = await manager.save(Novel, novel);
-
-      const slug = BuildSlug(parsedNovel.title!);
+      const novel = await manager.save(
+        Novel,
+        manager.create(Novel, {
+          status: parsedNovel.status ?? null,
+          authorId: author?.id ?? null,
+        })
+      );
 
       await manager.save(
         NovelTranslation,
         manager.create(NovelTranslation, {
-          novelId: savedNovel.id,
+          novelId: novel.id,
           languageCode: parsedNovel.languageCode,
           title: parsedNovel.title!,
           synopsis: parsedNovel.synopsis,
-          slug,
+          slug: BuildSlug(parsedNovel.title!),
           isDefault: true,
         })
       );
@@ -57,14 +79,17 @@ export class NovelImportService {
           title: parsedChapter.title || null,
           content: parsedChapter.content,
           baseSubNumber: parsedChapter.chapterSubNumber,
-          options: { maxLength: 20000, breakBuffer: 2000 },
+          options: {
+            maxLength: 20000,
+            breakBuffer: 2000,
+          },
         });
 
         for (const part of parts) {
           const chapter = await manager.save(
             Chapter,
             manager.create(Chapter, {
-              novelId: savedNovel.id,
+              novelId: novel.id,
               chapterNumber: parsedChapter.chapterNumber,
               chapterSubNumber: part.chapterSubNumber,
               volumeNumber: parsedChapter.volumeNumber,
@@ -84,14 +109,15 @@ export class NovelImportService {
         }
       }
 
-      return savedNovel;
+      return {
+        novelId: novel.id,
+        title: parsedNovel.title!,
+        chapterCount: parsedNovel.chapters.length,
+        languageCode: parsedNovel.languageCode,
+      };
     });
   }
 
-  /**
-   * Find existing author translation
-   * or create new author + translation.
-   */
   private async findOrCreateAuthor(
     manager: EntityManager,
     name: string,
@@ -103,8 +129,12 @@ export class NovelImportService {
       .getRepository(AuthorTranslation)
       .createQueryBuilder('translation')
       .leftJoinAndSelect('translation.author', 'author')
-      .where('LOWER(translation.name) = LOWER(:name)', { name: normalized })
-      .andWhere('translation.languageCode = :languageCode', { languageCode })
+      .where('LOWER(translation.name) = LOWER(:name)', {
+        name: normalized,
+      })
+      .andWhere('translation.languageCode = :languageCode', {
+        languageCode,
+      })
       .getOne();
 
     if (existingTranslation) {

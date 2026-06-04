@@ -1,15 +1,3 @@
-// import { JobStatus } from '@/common/constants/job.constant';
-//
-// export class UpdateJobStatusDto {
-//   status: JobStatus;
-//
-//   errorMessage?: string;
-//
-//   errorStack?: string;
-//
-//   attempts?: number;
-// }
-
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';

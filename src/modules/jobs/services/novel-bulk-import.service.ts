@@ -4,6 +4,7 @@ import { TemporaryStorageService } from '@/infrastructure/storage/services/tempo
 import { NovelBulkImportJobPayload } from '@/infrastructure/bullmq/queues/novel_bulk_import.queue';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
+  NOVEL_IMPORT_JOB,
   NOVEL_IMPORT_QUEUE,
   NovelImportJobPayload,
 } from '@/infrastructure/bullmq/queues/novel-import.queue';
@@ -29,26 +30,31 @@ export class NovelBulkImportService {
   ) {}
 
   async execute(payload: NovelBulkImportJobPayload) {
-    const file = await this.tempStorageService.getArchive(
+    const buffer = await this.tempStorageService.getArchive(
       payload.dbJobId,
       payload.fileName
     );
 
-    const zip = new AdmZip(file);
+    const zip = new AdmZip(buffer);
     const entries = zip.getEntries();
+
     const jobs: {
       name: string;
       data: NovelImportJobPayload;
     }[] = [];
+
+    let totalFiles = 0;
 
     for (const entry of entries) {
       if (entry.isDirectory) {
         continue;
       }
 
+      totalFiles++;
+
       const fileBuffer = entry.getData();
 
-      await this.tempStorageService.saveExtractedFile(
+      const storageKey = await this.tempStorageService.saveExtractedFile(
         payload.dbJobId,
         entry.entryName,
         fileBuffer
@@ -63,6 +69,42 @@ export class NovelBulkImportService {
           bulkJobId: payload.dbJobId,
         },
       });
+
+      jobs.push({
+        name: NOVEL_IMPORT_JOB,
+        data: {
+          dbJobId: dbJob.id,
+          bulkJobId: payload.dbJobId,
+          fileName: entry.entryName,
+          storageKey,
+        },
+      });
     }
+
+    const bullJobs = await this.novelImportQueue.addBulk(jobs);
+
+    for (let i = 0; i < bullJobs.length; i++) {
+      await this.jobsRepository.update(
+        { id: jobs[i].data.dbJobId },
+        {
+          queueJobId: String(bullJobs[i].id),
+        }
+      );
+    }
+
+    await this.jobsRepository.update(
+      { id: payload.dbJobId },
+      {
+        result: {
+          totalFiles,
+          processedFiles: 0,
+          failedFiles: 0,
+        } as Record<string, any>,
+      }
+    );
+
+    return {
+      totalFiles,
+    };
   }
 }

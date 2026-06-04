@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectFlowProducer, InjectQueue } from '@nestjs/bullmq';
 import {
   NOVEL_IMPORT_JOB,
@@ -30,14 +26,12 @@ import {
 } from '@/infrastructure/bullmq/queues/novel-index.queue';
 import { JobFlowFactory } from '@/modules/jobs/factories/job-flow.factory';
 import { FilenameUtil } from '@/common/utils/filename.util';
-import { BuildSlug } from '@/common/utils/build-novel-slug.util';
 import {
   NOVEL_BULK_IMPORT_QUEUE,
   NOVEL_BULK_IMPORT_JOB,
   NovelBulkImportJobPayload,
 } from '@/infrastructure/bullmq/queues/novel_bulk_import.queue';
 import { TemporaryStorageService } from '@/infrastructure/storage/services/temporary-storage.service';
-import { NovelParserService } from '@/modules/jobs/services/novel-parser.service';
 
 @Injectable()
 export class JobsService {
@@ -56,52 +50,33 @@ export class JobsService {
     private readonly dataSource: DataSource,
     private readonly novelService: NovelsService,
     private readonly flowFactory: JobFlowFactory,
-    private readonly tempStorageService: TemporaryStorageService,
-    private readonly novelParserService: NovelParserService
+    private readonly tempStorageService: TemporaryStorageService
   ) {}
 
   async enqueueNovelImport(file: Express.Multer.File, formatId?: string) {
-    const { parsedNovel, resolvedFormatId } =
-      this.novelParserService.previewNovelImport(file, formatId);
-
-    const slug = parsedNovel?.title ? BuildSlug(parsedNovel.title) : undefined;
-    if (slug) {
-      const novelExist = await this.novelService.findNovelBySlugOrId(slug);
-
-      if (novelExist) {
-        throw new ConflictException(
-          `Novel "${parsedNovel.title}" already exists`
-        );
-      }
-    }
-
-    const payloadNovel = {
-      ...parsedNovel,
-      chapters: parsedNovel.chapters.slice(0, 2),
-      synopsis:
-        parsedNovel.synopsis && parsedNovel.synopsis.length > 300
-          ? `${parsedNovel.synopsis.substring(0, 300)}...`
-          : parsedNovel.synopsis,
-    };
-
     const dbImportJob = await this.jobsRepository.save({
       type: JobType.IMPORT_NOVEL,
       status: JobStatus.WAITING,
       entityType: JobEntity.NOVEL,
       payload: {
-        formatId: resolvedFormatId,
-        source: resolvedFormatId,
-        parsedNovel: payloadNovel,
+        formatId,
       },
       attempts: 0,
     });
 
     try {
+      const normalizedFileName = FilenameUtil.normalize(file.originalname);
+      const storageKey = await this.tempStorageService.saveArchive(
+        dbImportJob.id,
+        normalizedFileName,
+        file.buffer
+      );
+
       const bullmqJob = await this.novelImportQueue.add(NOVEL_IMPORT_JOB, {
         dbJobId: dbImportJob.id,
-        formatId: resolvedFormatId,
-        source: resolvedFormatId,
-        parsedNovel,
+        fileName: normalizedFileName,
+        formatId,
+        storageKey,
       });
 
       await this.jobsRepository.update(
@@ -417,5 +392,57 @@ export class JobsService {
 
   async updateStatus(jobId: string, payload: UpdateJobStatusDto) {
     await this.jobsRepository.update(jobId, payload);
+  }
+
+  async incrementBulkProcessed(jobId: string) {
+    await this.jobsRepository.query(
+      `
+      UPDATE jobs
+      SET result = jsonb_set(
+        result,
+        '{processedFiles}',
+        to_jsonb(
+          COALESCE((result->>'processedFiles')::int, 0) + 1
+        )
+      )
+      WHERE id = $1
+    `,
+      [jobId]
+    );
+  }
+  async incrementBulkFailed(jobId: string) {
+    await this.jobsRepository.query(
+      `
+      UPDATE jobs
+      SET result = jsonb_set(
+        result,
+        '{failedFiles}',
+        to_jsonb(
+          COALESCE((result->>'failedFiles')::int, 0) + 1
+        )
+      )
+      WHERE id = $1
+    `,
+      [jobId]
+    );
+  }
+  async checkBulkCompletion(jobId: string) {
+    const bulkJob = await this.jobsRepository.findOneByOrFail({
+      id: jobId,
+    });
+
+    const result = (bulkJob.result ?? {}) as {
+      totalFiles?: number;
+      processedFiles?: number;
+      failedFiles?: number;
+    };
+
+    const total = result.totalFiles ?? 0;
+    const processed = result.processedFiles ?? 0;
+    const failed = result.failedFiles ?? 0;
+
+    if (processed + failed >= total) {
+      await this.markCompleted(jobId, 0);
+    }
   }
 }
