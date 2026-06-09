@@ -2,6 +2,8 @@ import 'dotenv/config';
 import { DataSourceOptions } from 'typeorm';
 import { isTruthyEnv } from '@/common/utils/is-truthy-env.util';
 
+const isProduction = isTruthyEnv(process.env.PRODUCTION);
+
 export const typeOrmConfig: DataSourceOptions = {
   type: 'postgres',
   host: process.env.DB_HOST,
@@ -10,7 +12,6 @@ export const typeOrmConfig: DataSourceOptions = {
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  synchronize: isTruthyEnv(process.env.DB_SYNC),
-  logging:
-    !isTruthyEnv(process.env.PRODUCTION) && isTruthyEnv(process.env.DB_VERBOSE),
+  synchronize: !isProduction && isTruthyEnv(process.env.DB_SYNC),
+  logging: !isProduction && isTruthyEnv(process.env.DB_VERBOSE),
 };

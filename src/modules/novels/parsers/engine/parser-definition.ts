@@ -1,3 +1,5 @@
+import { Lang } from '@/common/constants/lang.constant';
+
 export interface ParsedNovelMetadata {
   title: string | null;
   author: string | null;
@@ -6,7 +8,6 @@ export interface ParsedNovelMetadata {
 }
 
 export type PrefaceTitleSource =
-  | 'metadata.title'
   | string
   | ((metadata: ParsedNovelMetadata) => string | null);
 
@@ -72,7 +73,7 @@ export interface ChapterDefinition {
 export interface ParserDefinition {
   formatId: string;
   formatAliases?: string[];
-  languageCode: string;
+  languageCode: Lang;
   matchScore: (text: string) => number;
   metadata?: MetadataDefinition;
   chapter: ChapterDefinition;

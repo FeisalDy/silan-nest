@@ -14,6 +14,7 @@ import { Public } from '@/modules/auth/decorators/public.decorator';
 
 @Public()
 @Controller('auth')
+// @formatter:off
 export class AuthController {
   constructor(
     private readonly usersService: UsersService,

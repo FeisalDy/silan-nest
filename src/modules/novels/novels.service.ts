@@ -14,22 +14,195 @@ import { NovelTranslation } from './entities/novel-translation.entity';
 import { AuthorTranslation } from './entities/author-translation.entity';
 import { ChapterTranslation } from './entities/chapter-translation.entity';
 import { SearchService } from '@/infrastructure/search/search.service';
+import { UpdateNovelDto } from '@/modules/novels/dto/update-novel.dto';
+import { NovelAlias } from '@/modules/novels/entities/novel-alias.entity';
 
 @Injectable()
 export class NovelsService {
   constructor(
     @InjectRepository(Novel) private novelsRepository: Repository<Novel>,
     @InjectRepository(Chapter) private chaptersRepository: Repository<Chapter>,
+    @InjectRepository(NovelAlias)
+    private novelAliasRepository: Repository<NovelAlias>,
     @InjectRepository(NovelTranslation)
     private novelTranslationRepository: Repository<NovelTranslation>,
     private readonly searchService: SearchService
   ) {}
+
+  async getChapter(
+    novelId: string,
+    volumeNumber: number,
+    chapterNumber: number,
+    chapterSubNumber: number
+  ) {
+    const novel = await this.getNovelBySlugOrId(novelId);
+    if (!novel) {
+      throw new NotFoundException('Novel not found');
+    }
+
+    const qb = this.chaptersRepository.createQueryBuilder('chapter');
+
+    qb.leftJoinAndSelect('chapter.translations', 'translation')
+      .where('chapter.novel_id = :novelId', { novelId: novel.id })
+      .andWhere('chapter.volume_number = :volumeNumber', { volumeNumber })
+      .andWhere('chapter.chapter_number = :chapterNumber', { chapterNumber })
+      .andWhere('chapter.chapter_sub_number = :chapterSubNumber', {
+        chapterSubNumber,
+      });
+
+    const chapter = await qb.getOne();
+
+    if (!chapter) return null;
+
+    const [prev, next] = await Promise.all([
+      this.getPrevChapter(
+        novel.id,
+        chapter.volumeNumber,
+        chapterNumber,
+        chapterSubNumber
+      ),
+      this.getNextChapter(
+        novel.id,
+        chapter.volumeNumber,
+        chapterNumber,
+        chapterSubNumber
+      ),
+    ]);
+
+    const dto = this.mapChapterToDto(chapter);
+
+    dto.navigation = {
+      prev: prev
+        ? {
+            volumeNumber: prev.volumeNumber,
+            chapterNumber: prev.chapterNumber,
+            chapterSubNumber: prev.chapterSubNumber,
+          }
+        : null,
+      next: next
+        ? {
+            volumeNumber: next.volumeNumber,
+            chapterNumber: next.chapterNumber,
+            chapterSubNumber: next.chapterSubNumber,
+          }
+        : null,
+    };
+
+    return dto;
+  }
+
+  async getNextChapter(
+    novelId: string,
+    volumeNumber: number,
+    chapterNumber: number,
+    chapterSubNumber: number
+  ) {
+    return this.chaptersRepository
+      .createQueryBuilder('chapter')
+      .where('chapter.novel_id = :novelId', { novelId })
+      .andWhere(
+        '(chapter.volume_number, chapter.chapter_number, chapter.chapter_sub_number) > (:volumeNumber, :chapterNumber, :chapterSubNumber)',
+        { volumeNumber, chapterNumber, chapterSubNumber }
+      )
+      .orderBy('chapter.volume_number', 'ASC')
+      .addOrderBy('chapter.chapter_number', 'ASC')
+      .addOrderBy('chapter.chapter_sub_number', 'ASC')
+      .limit(1)
+      .getOne();
+  }
+
+  async getNovelBySlugOrId(identifier: string) {
+    const qb = this.novelsRepository
+      .createQueryBuilder('novel')
+      .leftJoinAndSelect(
+        'novel.translations',
+        'translation',
+        'translation.language_code = :lang OR translation.is_default = true',
+        { lang: Lang.ENGLISH }
+      )
+      .leftJoinAndSelect('novel.author', 'author')
+      .leftJoinAndSelect(
+        'author.translations',
+        'authorTrans',
+        'authorTrans.language_code = :lang OR authorTrans.is_default = true',
+        { lang: Lang.ENGLISH }
+      )
+      .leftJoinAndSelect('novel.aliases', 'alias');
+
+    qb.where('translation.slug = :slug', { slug: identifier });
+
+    if (isUUID(identifier)) {
+      qb.orWhere('novel.id = :id', { id: identifier });
+    }
+
+    const novel = await qb.getOne();
+
+    if (!novel) return null;
+
+    const chapterCount = await this.chaptersRepository.count({
+      where: { novelId: novel.id },
+    });
+
+    const dto = this.mapNovelToDto(novel);
+    dto.chapterCount = chapterCount;
+    return dto;
+  }
+
+  async getPrevChapter(
+    novelId: string,
+    volumeNumber: number,
+    chapterNumber: number,
+    chapterSubNumber: number
+  ) {
+    return this.chaptersRepository
+      .createQueryBuilder('chapter')
+      .where('chapter.novel_id = :novelId', { novelId })
+      .andWhere(
+        '(chapter.volume_number, chapter.chapter_number, chapter.chapter_sub_number) < (:volumeNumber, :chapterNumber, :chapterSubNumber)',
+        { volumeNumber, chapterNumber, chapterSubNumber }
+      )
+      .orderBy('chapter.volume_number', 'DESC')
+      .addOrderBy('chapter.chapter_number', 'DESC')
+      .addOrderBy('chapter.chapter_sub_number', 'DESC')
+      .limit(1)
+      .getOne();
+  }
 
   async hasTranslation(novelId: string, lang: Lang) {
     return await this.novelTranslationRepository.existsBy({
       novelId,
       languageCode: lang,
     });
+  }
+
+  async paginateNovelChapters(novelId: string, pageOptionsDto: PageOptionsDto) {
+    const novel = await this.getNovelBySlugOrId(novelId);
+    if (!novel) {
+      throw new NotFoundException('Novel not found');
+    }
+
+    const baseQuery = () =>
+      this.chaptersRepository
+        .createQueryBuilder('chapter')
+        .leftJoinAndSelect('chapter.translations', 'translation')
+        .where('chapter.novel_id = :novelId', { novelId: novel.id });
+
+    const itemCount = await baseQuery().getCount();
+
+    const { entities } = await baseQuery()
+      .orderBy('chapter.volumeNumber', pageOptionsDto.order)
+      .addOrderBy('chapter.chapterNumber', pageOptionsDto.order)
+      .addOrderBy('chapter.chapterSubNumber', pageOptionsDto.order)
+      .skip(pageOptionsDto.skip)
+      .take(pageOptionsDto.take)
+      .getRawAndEntities();
+
+    const chapterDtos = entities.map((chapter) =>
+      this.mapChapterToDto(chapter, 240)
+    );
+
+    const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto });
+    return new PageDto(chapterDtos, pageMetaDto);
   }
 
   async paginateNovels(pageOptionsDto: PageOptionsDto) {
@@ -80,43 +253,6 @@ export class NovelsService {
 
     const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto });
     return new PageDto(novelDtos, pageMetaDto);
-  }
-
-  async findNovelBySlugOrId(identifier: string) {
-    const qb = this.novelsRepository
-      .createQueryBuilder('novel')
-      .leftJoinAndSelect(
-        'novel.translations',
-        'translation',
-        'translation.language_code = :lang OR translation.is_default = true',
-        { lang: Lang.ENGLISH }
-      )
-      .leftJoinAndSelect('novel.author', 'author')
-      .leftJoinAndSelect(
-        'author.translations',
-        'authorTrans',
-        'authorTrans.language_code = :lang OR authorTrans.is_default = true',
-        { lang: Lang.ENGLISH }
-      )
-      .leftJoinAndSelect('novel.aliases', 'alias');
-
-    qb.where('translation.slug = :slug', { slug: identifier });
-
-    if (isUUID(identifier)) {
-      qb.orWhere('novel.id = :id', { id: identifier });
-    }
-
-    const novel = await qb.getOne();
-
-    if (!novel) return null;
-
-    const chapterCount = await this.chaptersRepository.count({
-      where: { novelId: novel.id },
-    });
-
-    const dto = this.mapNovelToDto(novel);
-    dto.chapterCount = chapterCount;
-    return dto;
   }
 
   async searchNovelsByChapterKeyword(query: string): Promise<any[]> {
@@ -192,187 +328,98 @@ export class NovelsService {
     });
   }
 
-  async paginateNovelChapters(novelId: string, pageOptionsDto: PageOptionsDto) {
-    const novel = await this.findNovelBySlugOrId(novelId);
-    if (!novel) {
-      throw new NotFoundException('Novel not found');
-    }
-
-    const baseQuery = () =>
-      this.chaptersRepository
-        .createQueryBuilder('chapter')
-        .leftJoinAndSelect('chapter.translations', 'translation')
-        .where('chapter.novel_id = :novelId', { novelId: novel.id });
-
-    const itemCount = await baseQuery().getCount();
-
-    const { entities } = await baseQuery()
-      .orderBy('chapter.volumeNumber', pageOptionsDto.order)
-      .addOrderBy('chapter.chapterNumber', pageOptionsDto.order)
-      .addOrderBy('chapter.chapterSubNumber', pageOptionsDto.order)
-      .skip(pageOptionsDto.skip)
-      .take(pageOptionsDto.take)
-      .getRawAndEntities();
-
-    const chapterDtos = entities.map((chapter) =>
-      this.mapChapterToDto(chapter, 240)
-    );
-
-    const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto });
-    return new PageDto(chapterDtos, pageMetaDto);
+  async deleteNovelById(id: string) {
+    await this.novelsRepository.delete(id);
   }
 
-  async findChapter(
-    novelId: string,
-    volumeNumber: number,
-    chapterNumber: number,
-    chapterSubNumber: number
-  ) {
-    const novel = await this.findNovelBySlugOrId(novelId);
-    if (!novel) {
-      throw new NotFoundException('Novel not found');
+  async setNovelById({
+    id,
+    updateNovelDto,
+  }: {
+    id: string;
+    updateNovelDto: UpdateNovelDto;
+  }) {
+    const existingNovel = await this.novelsRepository.findOne({
+      where: { id },
+    });
+    if (!existingNovel) {
+      throw new NotFoundException(`Novel with ID "${id}" not found`);
     }
 
-    const qb = this.chaptersRepository.createQueryBuilder('chapter');
+    const {
+      authorId,
+      coverUrl,
+      status,
+      aliases,
+      title,
+      slug,
+      synopsis,
+      languageCode,
+    } = updateNovelDto;
 
-    qb.leftJoinAndSelect('chapter.translations', 'translation')
-      .where('chapter.novel_id = :novelId', { novelId: novel.id })
-      .andWhere('chapter.volume_number = :volumeNumber', { volumeNumber })
-      .andWhere('chapter.chapter_number = :chapterNumber', { chapterNumber })
-      .andWhere('chapter.chapter_sub_number = :chapterSubNumber', {
-        chapterSubNumber,
+    if (coverUrl !== undefined) existingNovel.coverUrl = coverUrl;
+    if (status !== undefined) existingNovel.status = status;
+    if (authorId !== undefined) existingNovel.authorId = authorId;
+
+    await this.novelsRepository.save(existingNovel);
+
+    if (aliases !== undefined) {
+      await this.setNovelAliases(id, aliases);
+    }
+
+    if (languageCode && (title || slug || synopsis)) {
+      await this.setNovelTranslationByNovelIdAndLanguageCode({
+        novelId: id,
+        languageCode,
+        title,
+        slug,
+        synopsis,
       });
-
-    const chapter = await qb.getOne();
-
-    if (!chapter) return null;
-
-    const [prev, next] = await Promise.all([
-      this.findPrevChapter(
-        novel.id,
-        chapter.volumeNumber,
-        chapterNumber,
-        chapterSubNumber
-      ),
-      this.findNextChapter(
-        novel.id,
-        chapter.volumeNumber,
-        chapterNumber,
-        chapterSubNumber
-      ),
-    ]);
-
-    const dto = this.mapChapterToDto(chapter);
-
-    dto.navigation = {
-      prev: prev
-        ? {
-            volumeNumber: prev.volumeNumber,
-            chapterNumber: prev.chapterNumber,
-            chapterSubNumber: prev.chapterSubNumber,
-          }
-        : null,
-      next: next
-        ? {
-            volumeNumber: next.volumeNumber,
-            chapterNumber: next.chapterNumber,
-            chapterSubNumber: next.chapterSubNumber,
-          }
-        : null,
-    };
-
-    return dto;
+    }
   }
 
-  async findNextChapter(
-    novelId: string,
-    volumeNumber: number,
-    chapterNumber: number,
-    chapterSubNumber: number
-  ) {
-    return this.chaptersRepository
-      .createQueryBuilder('chapter')
-      .where('chapter.novel_id = :novelId', { novelId })
-      .andWhere(
-        '(chapter.volume_number, chapter.chapter_number, chapter.chapter_sub_number) > (:volumeNumber, :chapterNumber, :chapterSubNumber)',
-        { volumeNumber, chapterNumber, chapterSubNumber }
-      )
-      .orderBy('chapter.volume_number', 'ASC')
-      .addOrderBy('chapter.chapter_number', 'ASC')
-      .addOrderBy('chapter.chapter_sub_number', 'ASC')
-      .limit(1)
-      .getOne();
+  private async setNovelTranslationByNovelIdAndLanguageCode({
+    novelId,
+    languageCode,
+    title,
+    slug,
+    synopsis,
+  }: {
+    novelId: string;
+    languageCode: Lang;
+    title?: string;
+    slug?: string;
+    synopsis?: string | null;
+  }) {
+    let translation = await this.novelTranslationRepository.findOne({
+      where: { novelId, languageCode },
+    });
+
+    if (!translation) {
+      translation = this.novelTranslationRepository.create({
+        novelId,
+        languageCode,
+      });
+    }
+
+    if (title !== undefined) translation.title = title;
+    if (slug !== undefined) translation.slug = slug;
+    if (synopsis !== undefined) translation.synopsis = synopsis;
+
+    await this.novelTranslationRepository.save(translation);
   }
 
-  async findPrevChapter(
-    novelId: string,
-    volumeNumber: number,
-    chapterNumber: number,
-    chapterSubNumber: number
-  ) {
-    return this.chaptersRepository
-      .createQueryBuilder('chapter')
-      .where('chapter.novel_id = :novelId', { novelId })
-      .andWhere(
-        '(chapter.volume_number, chapter.chapter_number, chapter.chapter_sub_number) < (:volumeNumber, :chapterNumber, :chapterSubNumber)',
-        { volumeNumber, chapterNumber, chapterSubNumber }
-      )
-      .orderBy('chapter.volume_number', 'DESC')
-      .addOrderBy('chapter.chapter_number', 'DESC')
-      .addOrderBy('chapter.chapter_sub_number', 'DESC')
-      .limit(1)
-      .getOne();
-  }
+  private async setNovelAliases(novelId: string, aliases: Array<string>) {
+    await this.novelAliasRepository.delete(novelId);
 
-  private pickTranslation<
-    T extends {
-      languageCode: string;
-      isDefault?: boolean;
-    },
-  >(translations: T[] | undefined): T | undefined {
-    if (!translations?.length) return undefined;
-    return (
-      translations.find((t) => t.languageCode === (Lang.ENGLISH as string)) ??
-      translations.find((t) => t.isDefault) ??
-      translations[0]
-    );
-  }
-
-  private pickChapterTranslation(
-    translations: ChapterTranslation[] | undefined
-  ) {
-    if (!translations?.length) return undefined;
-    return (
-      translations.find((t) => t.languageCode === (Lang.ENGLISH as string)) ??
-      translations[0]
-    );
-  }
-
-  private mapNovelToDto(novel: Novel): NovelDto {
-    const trans = this.pickTranslation<NovelTranslation>(novel.translations);
-    const authTrans = this.pickTranslation<AuthorTranslation>(
-      novel.author?.translations
+    const newAliases = aliases.map((alias) =>
+      this.novelAliasRepository.create({
+        novelId: novelId,
+        aliasTitle: alias,
+      })
     );
 
-    return {
-      id: novel.id,
-      title: trans?.title || 'Untitled',
-      slug: trans?.slug || '',
-      synopsis: trans?.synopsis || '',
-      coverUrl: novel.coverUrl,
-      status: novel.status,
-      languageCode: trans?.languageCode ?? '',
-      createdAt: novel.createdAt,
-      aliases: novel.aliases?.map((a) => a.aliasTitle) || [],
-      author: novel.author
-        ? {
-            id: novel.author.id,
-            name: authTrans?.name ?? null,
-            photoUrl: novel.author.photoUrl ?? null,
-            biography: authTrans?.biography ?? null,
-          }
-        : null,
-    };
+    await this.novelAliasRepository.save(newAliases);
   }
 
   private mapChapterToDto(
@@ -401,5 +448,56 @@ export class NovelsService {
       content: content ?? '',
       createdAt: chapter.createdAt,
     };
+  }
+
+  private mapNovelToDto(novel: Novel): NovelDto {
+    const trans = this.pickTranslation<NovelTranslation>(novel.translations);
+    const authTrans = this.pickTranslation<AuthorTranslation>(
+      novel.author?.translations
+    );
+
+    return {
+      id: novel.id,
+      title: trans!.title,
+      slug: trans!.slug,
+      synopsis: trans!.synopsis,
+      coverUrl: novel.coverUrl,
+      status: novel.status,
+      languageCode: trans!.languageCode,
+      createdAt: novel.createdAt,
+      aliases: novel.aliases?.map((a) => a.aliasTitle) || [],
+      author: novel.author
+        ? {
+            id: novel.author.id,
+            name: authTrans?.name ?? null,
+            photoUrl: novel.author.photoUrl ?? null,
+            biography: authTrans?.biography ?? null,
+          }
+        : null,
+    };
+  }
+
+  private pickChapterTranslation(
+    translations: ChapterTranslation[] | undefined
+  ) {
+    if (!translations?.length) return undefined;
+    return (
+      translations.find((t) => t.languageCode === (Lang.ENGLISH as string)) ??
+      translations[0]
+    );
+  }
+
+  private pickTranslation<
+    T extends {
+      languageCode: string;
+      isDefault?: boolean;
+    },
+  >(translations: T[] | undefined): T | undefined {
+    if (!translations?.length) return undefined;
+    return (
+      translations.find((t) => t.languageCode === (Lang.ENGLISH as string)) ??
+      translations.find((t) => t.isDefault) ??
+      translations[0]
+    );
   }
 }

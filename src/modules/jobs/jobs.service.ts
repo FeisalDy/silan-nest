@@ -158,7 +158,7 @@ export class JobsService {
   }
 
   async enqueueNovelIndex(novelId: string, lang: Lang) {
-    const novel = await this.novelService.findNovelBySlugOrId(novelId);
+    const novel = await this.novelService.getNovelBySlugOrId(novelId);
 
     if (!novel) {
       throw new NotFoundException('Novel not found');
@@ -209,7 +209,7 @@ export class JobsService {
   }
 
   async enqueueNovelProcessing(novelId: string, targetLang: Lang) {
-    const novel = await this.novelService.findNovelBySlugOrId(novelId);
+    const novel = await this.novelService.getNovelBySlugOrId(novelId);
 
     if (!novel) {
       throw new NotFoundException('Novel not found');

@@ -20,8 +20,8 @@ export class NovelAlias {
   @Column({ name: 'alias_title', type: 'varchar', length: 255 })
   aliasTitle: string;
 
-  @Column({ name: 'language_code', type: 'varchar', length: 5, nullable: true })
-  languageCode: string | null;
+  // @Column({ name: 'language_code', type: 'varchar', length: 5, nullable: true })
+  // languageCode: string | null;
 
   @ManyToOne(() => Novel, (novel: Novel) => novel.aliases, {
     onDelete: 'CASCADE',

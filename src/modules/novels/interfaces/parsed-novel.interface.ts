@@ -1,3 +1,5 @@
+import { Lang } from '@/common/constants/lang.constant';
+
 export interface ParsedChapter {
   chapterNumber: number;
   chapterSubNumber: number;
@@ -11,7 +13,7 @@ export interface ParsedNovel {
   author: string | null;
   synopsis: string | null;
   status: string | null;
-  languageCode: string;
+  languageCode: Lang;
   chapters: ParsedChapter[];
 }
 

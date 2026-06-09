@@ -7,6 +7,7 @@ import {
   Unique,
 } from 'typeorm';
 import { Novel } from './novel.entity';
+import { Lang } from '@/common/constants/lang.constant';
 
 @Entity('novel_translations')
 @Unique(['novelId', 'languageCode'])
@@ -20,8 +21,12 @@ export class NovelTranslation {
   @Column({ type: 'varchar', length: 255, unique: true })
   slug: string;
 
-  @Column({ name: 'language_code', type: 'varchar', length: 5 })
-  languageCode: string;
+  @Column({
+    name: 'language_code',
+    type: 'enum',
+    enum: Lang,
+  })
+  languageCode: Lang;
 
   @Column({ type: 'varchar', length: 255 })
   title: string;

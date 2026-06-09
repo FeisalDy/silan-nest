@@ -1,7 +1,6 @@
 import { Seeder, SeederFactoryManager } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
 
-import { Lang } from '@/common/constants/lang.constant';
 import { Novel } from '@/modules/novels/entities/novel.entity';
 import { NovelAlias } from '@/modules/novels/entities/novel-alias.entity';
 
@@ -25,7 +24,6 @@ export default class NovelAliasSeeder implements Seeder {
       for (let i = 0; i < aliasCount; i++) {
         const alias = await novelAliasFactory.make({
           novel,
-          languageCode: Math.random() > 0.5 ? Lang.ENGLISH : Lang.CHINESE_PRC,
         });
 
         aliases.push(alias);

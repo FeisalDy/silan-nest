@@ -6,20 +6,26 @@ import {
   ParseIntPipe,
   Query,
   BadRequestException,
+  Put,
+  Body,
+  Delete,
 } from '@nestjs/common';
 import { NovelsService } from './novels.service';
 import { PageOptionsDto } from '@/common/dto/page-options.dto';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Public } from '@/modules/auth/decorators/public.decorator';
+import { UpdateNovelDto } from '@/modules/novels/dto/update-novel.dto';
 
-@ApiTags('novels')
+@ApiTags('Novels')
+@ApiBearerAuth('access-token')
 @Controller('novels')
+// @formatter:off
 export class NovelsController {
   constructor(private readonly novelsService: NovelsService) {}
 
   @Public()
   @Get()
-  async findAll(@Query() pageOptionsDto: PageOptionsDto) {
+  async getAllWithPagination(@Query() pageOptionsDto: PageOptionsDto) {
     return this.novelsService.paginateNovels(pageOptionsDto);
   }
 
@@ -32,35 +38,36 @@ export class NovelsController {
     return this.novelsService.searchNovelsByChapterKeyword(query);
   }
 
-  @Public()
-  @Get(':identifier')
-  async findOne(@Param('identifier') identifier: string) {
-    const novel = await this.novelsService.findNovelBySlugOrId(identifier);
+  @Put(':id')
+  async setNovelById(
+    @Param('id') id: string,
+    @Body() updateNovelDto: UpdateNovelDto
+  ) {
+    return this.novelsService.setNovelById({ id, updateNovelDto });
+  }
 
-    if (!novel) {
-      throw new NotFoundException('Novel not found');
-    }
-
-    return novel;
+  @Delete(':id')
+  async deleteNovelById(@Param('id') id: string) {
+    return this.novelsService.deleteNovelById(id);
   }
 
   @Public()
-  @Get(':novelId/chapters')
-  findChaptersByNovelId(
-    @Param('novelId') novelId: string,
+  @Get(':id/chapters')
+  getAllChaptersByNovelIdWithPagination(
+    @Param('id') id: string,
     @Query() pageOptionsDto: PageOptionsDto
   ) {
-    return this.novelsService.paginateNovelChapters(novelId, pageOptionsDto);
+    return this.novelsService.paginateNovelChapters(id, pageOptionsDto);
   }
 
   @Public()
-  @Get(':novelId/chapters/:volumeNumber/:chapterNumber')
-  async getMainChapter(
-    @Param('novelId') novelId: string,
+  @Get(':id/chapters/:volumeNumber/:chapterNumber')
+  async getChapter(
+    @Param('id') id: string,
     @Param('volumeNumber', ParseIntPipe) volumeNumber: number,
     @Param('chapterNumber', ParseIntPipe) chapterNumber: number
   ) {
-    return this.getChapter(novelId, volumeNumber, chapterNumber, 0);
+    return this.novelsService.getChapter(id, volumeNumber, chapterNumber, 0);
   }
 
   @Public()
@@ -71,7 +78,7 @@ export class NovelsController {
     @Param('chapterNumber', ParseIntPipe) chapterNumber: number,
     @Param('chapterSubNumber', ParseIntPipe) chapterSubNumber: number
   ) {
-    return this.getChapter(
+    return this.novelsService.getChapter(
       novelId,
       volumeNumber,
       chapterNumber,
@@ -79,23 +86,15 @@ export class NovelsController {
     );
   }
 
-  private async getChapter(
-    novelId: string,
-    volumeNumber: number,
-    chapterNumber: number,
-    chapterSubNumber: number
-  ) {
-    const chapter = await this.novelsService.findChapter(
-      novelId,
-      volumeNumber,
-      chapterNumber,
-      chapterSubNumber
-    );
+  @Public()
+  @Get(':identifier')
+  async getNovelByIdentifier(@Param('identifier') identifier: string) {
+    const novel = await this.novelsService.getNovelBySlugOrId(identifier);
 
-    if (!chapter) {
-      throw new NotFoundException('Chapter not found');
+    if (!novel) {
+      throw new NotFoundException('Novel not found');
     }
 
-    return chapter;
+    return novel;
   }
 }

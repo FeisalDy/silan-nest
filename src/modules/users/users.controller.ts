@@ -5,6 +5,7 @@ import { Role } from '@/common/constants/role.constant';
 
 @Controller('users')
 @Roles(Role.ADMIN)
+// @formatter:off
 export class UsersController {
   constructor(private usersService: UsersService) {}
   @Get()

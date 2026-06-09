@@ -33,6 +33,7 @@ import { NovelParserService } from '@/modules/jobs/services/novel-parser.service
 @ApiTags('Jobs')
 @ApiBearerAuth('access-token')
 @Controller('jobs')
+// @formatter:off
 export class JobsController {
   constructor(
     private readonly jobsService: JobsService,
