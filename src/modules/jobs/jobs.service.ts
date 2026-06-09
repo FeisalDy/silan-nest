@@ -32,6 +32,10 @@ import {
   NovelBulkImportJobPayload,
 } from '@/infrastructure/bullmq/queues/novel_bulk_import.queue';
 import { TemporaryStorageService } from '@/infrastructure/storage/services/temporary-storage.service';
+import { GetJobsQueryRequestDto } from '@/modules/jobs/dto/get-jobs-query.request.dto';
+import { JobDto } from '@/modules/jobs/dto/job.dto';
+import { PageMetaDto } from '@/common/dto/page-meta.dto';
+import { PageDto } from '@/common/dto/page.dto';
 
 @Injectable()
 export class JobsService {
@@ -53,54 +57,64 @@ export class JobsService {
     private readonly tempStorageService: TemporaryStorageService
   ) {}
 
-  async enqueueNovelImport(file: Express.Multer.File, formatId?: string) {
-    const dbImportJob = await this.jobsRepository.save({
-      type: JobType.IMPORT_NOVEL,
-      status: JobStatus.WAITING,
-      entityType: JobEntity.NOVEL,
-      payload: {
-        formatId,
-      },
-      attempts: 0,
+  async getAllWithPagination(getJobsQueryRequestDto: GetJobsQueryRequestDto) {
+    const qb = this.jobsRepository.createQueryBuilder('job');
+
+    if (getJobsQueryRequestDto.status) {
+      qb.andWhere('job.status = :status', {
+        status: getJobsQueryRequestDto.status,
+      });
+    }
+
+    if (getJobsQueryRequestDto.type) {
+      qb.andWhere('job.type = :type', { type: getJobsQueryRequestDto.type });
+    }
+
+    if (getJobsQueryRequestDto.entityId) {
+      qb.andWhere('job.entityId = :entityId', {
+        entityId: getJobsQueryRequestDto.entityId,
+      });
+    }
+
+    qb.orderBy('job.createdAt', getJobsQueryRequestDto.order)
+      .skip(getJobsQueryRequestDto.skip)
+      .take(getJobsQueryRequestDto.take);
+
+    const [jobs, itemCount] = await qb.getManyAndCount();
+    const pageMetaDto = new PageMetaDto({
+      itemCount,
+      pageOptionsDto: getJobsQueryRequestDto,
     });
 
-    try {
-      const normalizedFileName = FilenameUtil.normalize(file.originalname);
-      const storageKey = await this.tempStorageService.saveArchive(
-        dbImportJob.id,
-        normalizedFileName,
-        file.buffer
-      );
+    const jobDto = jobs.map((job) => this.mapJobToDto(job));
 
-      const bullmqJob = await this.novelImportQueue.add(NOVEL_IMPORT_JOB, {
-        dbJobId: dbImportJob.id,
-        fileName: normalizedFileName,
-        formatId,
-        storageKey,
-      });
+    return new PageDto(jobDto, pageMetaDto);
+  }
 
-      await this.jobsRepository.update(
-        { id: dbImportJob.id },
-        {
-          queueJobId: String(bullmqJob.id),
-        }
-      );
+  async attachEntity(jobId: string, entityType: JobEntity, entityId: string) {
+    await this.jobsRepository.update(jobId, {
+      entityType,
+      entityId,
+    });
+  }
 
-      return {
-        status: JobStatus.WAITING,
-        jobId: dbImportJob.id,
-      };
-    } catch (error) {
-      await this.jobsRepository.update(
-        { id: dbImportJob.id },
-        {
-          status: JobStatus.FAILED,
-          failedAt: new Date(),
-          errorMessage: error instanceof Error ? error.message : String(error),
-        }
-      );
+  async checkBulkCompletion(jobId: string) {
+    const bulkJob = await this.jobsRepository.findOneByOrFail({
+      id: jobId,
+    });
 
-      throw error;
+    const result = (bulkJob.result ?? {}) as {
+      totalFiles?: number;
+      processedFiles?: number;
+      failedFiles?: number;
+    };
+
+    const total = result.totalFiles ?? 0;
+    const processed = result.processedFiles ?? 0;
+    const failed = result.failedFiles ?? 0;
+
+    if (processed + failed >= total) {
+      await this.markCompleted(jobId, 0);
     }
   }
 
@@ -146,6 +160,57 @@ export class JobsService {
     } catch (error) {
       await this.jobsRepository.update(
         { id: dbBulkImportJob.id },
+        {
+          status: JobStatus.FAILED,
+          failedAt: new Date(),
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }
+      );
+
+      throw error;
+    }
+  }
+
+  async enqueueNovelImport(file: Express.Multer.File, formatId?: string) {
+    const dbImportJob = await this.jobsRepository.save({
+      type: JobType.IMPORT_NOVEL,
+      status: JobStatus.WAITING,
+      entityType: JobEntity.NOVEL,
+      payload: {
+        formatId,
+      },
+      attempts: 0,
+    });
+
+    try {
+      const normalizedFileName = FilenameUtil.normalize(file.originalname);
+      const storageKey = await this.tempStorageService.saveArchive(
+        dbImportJob.id,
+        normalizedFileName,
+        file.buffer
+      );
+
+      const bullmqJob = await this.novelImportQueue.add(NOVEL_IMPORT_JOB, {
+        dbJobId: dbImportJob.id,
+        fileName: normalizedFileName,
+        formatId,
+        storageKey,
+      });
+
+      await this.jobsRepository.update(
+        { id: dbImportJob.id },
+        {
+          queueJobId: String(bullmqJob.id),
+        }
+      );
+
+      return {
+        status: JobStatus.WAITING,
+        jobId: dbImportJob.id,
+      };
+    } catch (error) {
+      await this.jobsRepository.update(
+        { id: dbImportJob.id },
         {
           status: JobStatus.FAILED,
           failedAt: new Date(),
@@ -351,18 +416,46 @@ export class JobsService {
 
   async getJob(jobId: string) {
     const job = await this.jobsRepository.findOneBy({ id: jobId });
+
     if (!job) {
       throw new NotFoundException('Job not found');
     }
-    return job;
+
+    return this.mapJobToDto(job);
   }
 
-  async markRunning(jobId: string, attempts: number) {
-    await this.jobsRepository.update(jobId, {
-      status: JobStatus.RUNNING,
-      startedAt: new Date(),
-      attempts,
-    });
+  async incrementBulkFailed(jobId: string) {
+    await this.jobsRepository.query(
+      `
+      UPDATE jobs
+      SET result = jsonb_set(
+        result,
+        '{failedFiles}',
+        to_jsonb(
+          COALESCE((result->>'failedFiles')::int, 0) + 1
+        )
+      )
+      WHERE id = $1
+    `,
+      [jobId]
+    );
+  }
+
+  async incrementBulkProcessed(jobId: string) {
+    await this.jobsRepository.query(
+      `
+      UPDATE jobs
+      SET result = jsonb_set(
+        result,
+        '{processedFiles}',
+        to_jsonb(
+          COALESCE((result->>'processedFiles')::int, 0) + 1
+        )
+      )
+      WHERE id = $1
+    `,
+      [jobId]
+    );
   }
 
   async markCompleted(jobId: string, attempts: number) {
@@ -383,10 +476,11 @@ export class JobsService {
     });
   }
 
-  async attachEntity(jobId: string, entityType: JobEntity, entityId: string) {
+  async markRunning(jobId: string, attempts: number) {
     await this.jobsRepository.update(jobId, {
-      entityType,
-      entityId,
+      status: JobStatus.RUNNING,
+      startedAt: new Date(),
+      attempts,
     });
   }
 
@@ -394,55 +488,25 @@ export class JobsService {
     await this.jobsRepository.update(jobId, payload);
   }
 
-  async incrementBulkProcessed(jobId: string) {
-    await this.jobsRepository.query(
-      `
-      UPDATE jobs
-      SET result = jsonb_set(
-        result,
-        '{processedFiles}',
-        to_jsonb(
-          COALESCE((result->>'processedFiles')::int, 0) + 1
-        )
-      )
-      WHERE id = $1
-    `,
-      [jobId]
-    );
-  }
-  async incrementBulkFailed(jobId: string) {
-    await this.jobsRepository.query(
-      `
-      UPDATE jobs
-      SET result = jsonb_set(
-        result,
-        '{failedFiles}',
-        to_jsonb(
-          COALESCE((result->>'failedFiles')::int, 0) + 1
-        )
-      )
-      WHERE id = $1
-    `,
-      [jobId]
-    );
-  }
-  async checkBulkCompletion(jobId: string) {
-    const bulkJob = await this.jobsRepository.findOneByOrFail({
-      id: jobId,
-    });
-
-    const result = (bulkJob.result ?? {}) as {
-      totalFiles?: number;
-      processedFiles?: number;
-      failedFiles?: number;
+  // TODO: Add failed Job Retry
+  private mapJobToDto(job: Job): JobDto {
+    return {
+      id: job.id,
+      type: job.type,
+      status: job.status,
+      entityType: job.entityType,
+      entityId: job.entityId,
+      sourceLanguage: job.sourceLanguage,
+      targetLanguage: job.targetLanguage,
+      payload: job.payload,
+      result: job.result,
+      errorMessage: job.errorMessage,
+      attempts: job.attempts,
+      startedAt: job.startedAt,
+      completedAt: job.startedAt,
+      failedAt: job.failedAt,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
     };
-
-    const total = result.totalFiles ?? 0;
-    const processed = result.processedFiles ?? 0;
-    const failed = result.failedFiles ?? 0;
-
-    if (processed + failed >= total) {
-      await this.markCompleted(jobId, 0);
-    }
   }
 }

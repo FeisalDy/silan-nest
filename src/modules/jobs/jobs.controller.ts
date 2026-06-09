@@ -11,6 +11,7 @@ import {
   Patch,
   Param,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { ApiBody, ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -28,6 +29,7 @@ import { InternalTokenGuard } from '@/modules/auth/guards/internal-token.guard';
 import { Public } from '@/modules/auth/decorators/public.decorator';
 import { ZipValidatorUtil } from '@/common/utils/validate-zip.util';
 import { NovelParserService } from '@/modules/jobs/services/novel-parser.service';
+import { GetJobsQueryRequestDto } from '@/modules/jobs/dto/get-jobs-query.request.dto';
 
 @Roles(Role.EDITOR)
 @ApiTags('Jobs')
@@ -39,6 +41,12 @@ export class JobsController {
     private readonly jobsService: JobsService,
     private readonly novelParserService: NovelParserService
   ) {}
+  @Get()
+  async getAllWithPagination(
+    @Query() getJobsQueryRequestDto: GetJobsQueryRequestDto
+  ) {
+    return this.jobsService.getAllWithPagination(getJobsQueryRequestDto);
+  }
   @Post('import-novel')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
@@ -151,11 +159,7 @@ export class JobsController {
 
   @Get(':jobId')
   async getJob(@Param('jobId') jobId: string) {
-    const job = await this.jobsService.getJob(jobId);
-    if (!job) {
-      throw new BadRequestException('Job not found');
-    }
-    return job;
+    return await this.jobsService.getJob(jobId);
   }
 
   @Patch(':jobId/status')
