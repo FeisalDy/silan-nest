@@ -6,101 +6,106 @@ import { RegexUtils } from './regex-utils';
 
 @Injectable()
 export class ChapterExtractor {
-  constructor(private readonly chapterBuilder: ChapterBuilder) {}
+    constructor(private readonly chapterBuilder: ChapterBuilder) {}
 
-  extract(
-    text: string,
-    definition: ParserDefinition,
-    metadata: ParsedNovelMetadata,
-    chapterLimit?: number
-  ): ParsedChapter[] {
-    const chapters: ParsedChapter[] = [];
-    const headingRe = RegexUtils.toGlobal(definition.chapter.heading.regex);
+    extract(
+        text: string,
+        definition: ParserDefinition,
+        metadata: ParsedNovelMetadata,
+        chapterLimit?: number
+    ): ParsedChapter[] {
+        const chapters: ParsedChapter[] = [];
+        const headingRe = RegexUtils.toGlobal(definition.chapter.heading.regex);
 
-    let match = headingRe.exec(text);
-    const firstHeadingIndex = match ? match.index : -1;
+        let match = headingRe.exec(text);
+        const firstHeadingIndex = match ? match.index : -1;
 
-    if (definition.chapter.preface?.enabled) {
-      const prefaceContent = this.extractPrefaceContent(text, firstHeadingIndex);
-      if (prefaceContent) {
-        chapters.push(
-          this.chapterBuilder.buildPrefaceChapter(
-            prefaceContent,
-            definition.chapter.preface,
-            metadata
-          )
-        );
+        if (definition.chapter.preface?.enabled) {
+            const prefaceContent = this.extractPrefaceContent(
+                text,
+                firstHeadingIndex
+            );
+            if (prefaceContent) {
+                chapters.push(
+                    this.chapterBuilder.buildPrefaceChapter(
+                        prefaceContent,
+                        definition.chapter.preface,
+                        metadata
+                    )
+                );
 
-        if (chapterLimit && chapters.length >= chapterLimit) {
-          return chapters;
+                if (chapterLimit && chapters.length >= chapterLimit) {
+                    return chapters;
+                }
+            }
         }
-      }
-    }
 
-    if (!match) {
-      return chapters;
-    }
-
-    let lastIndex = 0;
-    let lastMatch: RegExpExecArray | null = null;
-    let currentVolume = definition.chapter.volume.startAt;
-    let previousChapterNumber = 0;
-
-    do {
-      if (lastMatch) {
-        const content = text.slice(lastIndex, match.index).trim();
-        chapters.push(
-          this.chapterBuilder.buildChapter(
-            lastMatch,
-            content,
-            currentVolume,
-            definition
-          )
-        );
-
-        if (chapterLimit && chapters.length >= chapterLimit) {
-          return chapters;
+        if (!match) {
+            return chapters;
         }
-      }
 
-      const chapterNumber = definition.chapter.numberParser(match[
-        definition.chapter.heading.numberGroup
-      ] ?? '');
+        let lastIndex = 0;
+        let lastMatch: RegExpExecArray | null = null;
+        let currentVolume = definition.chapter.volume.startAt;
+        let previousChapterNumber = 0;
 
-      if (
-        lastMatch !== null &&
-        definition.chapter.volume.incrementOnReset &&
-        chapterNumber <= previousChapterNumber
-      ) {
-        currentVolume++;
-      }
+        do {
+            if (lastMatch) {
+                const content = text.slice(lastIndex, match.index).trim();
+                chapters.push(
+                    this.chapterBuilder.buildChapter(
+                        lastMatch,
+                        content,
+                        currentVolume,
+                        definition
+                    )
+                );
 
-      previousChapterNumber = chapterNumber;
-      lastMatch = match;
-      lastIndex = headingRe.lastIndex;
-    } while ((match = headingRe.exec(text)) !== null);
+                if (chapterLimit && chapters.length >= chapterLimit) {
+                    return chapters;
+                }
+            }
 
-    if (lastMatch && (!chapterLimit || chapters.length < chapterLimit)) {
-      const content = text.slice(lastIndex).trim();
-      chapters.push(
-        this.chapterBuilder.buildChapter(
-          lastMatch,
-          content,
-          currentVolume,
-          definition
-        )
-      );
+            const chapterNumber = definition.chapter.numberParser(
+                match[definition.chapter.heading.numberGroup] ?? ''
+            );
+
+            if (
+                lastMatch !== null &&
+                definition.chapter.volume.incrementOnReset &&
+                chapterNumber <= previousChapterNumber
+            ) {
+                currentVolume++;
+            }
+
+            previousChapterNumber = chapterNumber;
+            lastMatch = match;
+            lastIndex = headingRe.lastIndex;
+        } while ((match = headingRe.exec(text)) !== null);
+
+        if (lastMatch && (!chapterLimit || chapters.length < chapterLimit)) {
+            const content = text.slice(lastIndex).trim();
+            chapters.push(
+                this.chapterBuilder.buildChapter(
+                    lastMatch,
+                    content,
+                    currentVolume,
+                    definition
+                )
+            );
+        }
+
+        return chapters;
     }
 
-    return chapters;
-  }
+    private extractPrefaceContent(
+        text: string,
+        firstHeadingIndex: number
+    ): string {
+        if (firstHeadingIndex <= 0) {
+            return text.trim();
+        }
 
-  private extractPrefaceContent(text: string, firstHeadingIndex: number): string {
-    if (firstHeadingIndex <= 0) {
-      return text.trim();
+        return text.slice(0, firstHeadingIndex).trim();
     }
-
-    return text.slice(0, firstHeadingIndex).trim();
-  }
 }
-

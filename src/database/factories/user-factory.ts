@@ -3,16 +3,16 @@ import { User } from '@/modules/users/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 
 export default setSeederFactory(User, async (faker) => {
-  const user = new User();
+    const user = new User();
 
-  user.email = faker.internet.email().toLowerCase();
-  user.username = faker.internet.username().toLowerCase();
+    user.email = faker.internet.email().toLowerCase();
+    user.username = faker.internet.username().toLowerCase();
 
-  const salt = await bcrypt.genSalt(10);
-  user.passwordHash = await bcrypt.hash('password', salt);
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash('password', salt);
 
-  user.isActive = true;
-  user.isEmailVerified = true;
+    user.isActive = true;
+    user.isEmailVerified = true;
 
-  return user;
+    return user;
 });

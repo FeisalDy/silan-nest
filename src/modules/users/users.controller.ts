@@ -7,9 +7,9 @@ import { Role } from '@/common/constants/role.constant';
 @Roles(Role.ADMIN)
 // @formatter:off
 export class UsersController {
-  constructor(private usersService: UsersService) {}
-  @Get()
-  findAll() {
-    return 'This action returns all users';
-  }
+    constructor(private usersService: UsersService) {}
+    @Get()
+    findAll() {
+        return 'This action returns all users';
+    }
 }

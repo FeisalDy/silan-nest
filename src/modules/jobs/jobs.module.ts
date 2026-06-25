@@ -16,24 +16,24 @@ import { NovelBulkImportService } from '@/modules/jobs/services/novel-bulk-impor
 import { NovelParserService } from '@/modules/jobs/services/novel-parser.service';
 
 @Module({
-  imports: [
-    NovelsModule,
-    StorageModule,
-    TypeOrmModule.forFeature([Job]),
-    SearchModule.register(),
-  ],
+    imports: [
+        NovelsModule,
+        StorageModule,
+        TypeOrmModule.forFeature([Job]),
+        SearchModule.register(),
+    ],
 
-  providers: [
-    JobsService,
-    NovelImportService,
-    NovelImportProcessor,
-    JobFlowFactory,
-    NovelIndexService,
-    NovelIndexProcessor,
-    NovelBulkImportService,
-    NovelBulkImportProcessor,
-    NovelParserService,
-  ],
-  controllers: [JobsController],
+    providers: [
+        JobsService,
+        NovelImportService,
+        NovelImportProcessor,
+        JobFlowFactory,
+        NovelIndexService,
+        NovelIndexProcessor,
+        NovelBulkImportService,
+        NovelBulkImportProcessor,
+        NovelParserService,
+    ],
+    controllers: [JobsController],
 })
-export class JobsModule {}
+export class JobsModule { }

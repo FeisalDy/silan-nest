@@ -1,37 +1,37 @@
 import {
-  Column,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-  Unique,
+    Column,
+    Entity,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
+    Unique,
 } from 'typeorm';
 import { Chapter } from './chapter.entity';
 
 @Entity('chapter_translations')
 @Unique(['chapterId', 'languageCode'])
 export class ChapterTranslation {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-  @Column({ name: 'chapter_id' })
-  chapterId: string;
+    @Column({ name: 'chapter_id' })
+    chapterId: string;
 
-  @Column({ name: 'language_code', type: 'varchar', length: 5 })
-  languageCode: string;
+    @Column({ name: 'language_code', type: 'varchar', length: 5 })
+    languageCode: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  title: string | null;
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    title: string | null;
 
-  @Column({ type: 'text' })
-  content: string;
+    @Column({ type: 'text' })
+    content: string;
 
-  @Column({ name: 'is_default', type: 'boolean', default: false })
-  isDefault: boolean;
+    @Column({ name: 'is_default', type: 'boolean', default: false })
+    isDefault: boolean;
 
-  @ManyToOne(() => Chapter, (chapter: Chapter) => chapter.translations, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'chapter_id' })
-  chapter: Chapter;
+    @ManyToOne(() => Chapter, (chapter: Chapter) => chapter.translations, {
+        onDelete: 'CASCADE',
+    })
+    @JoinColumn({ name: 'chapter_id' })
+    chapter: Chapter;
 }

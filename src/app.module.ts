@@ -14,35 +14,35 @@ import { JobsModule } from '@/modules/jobs/jobs.module';
 import { StorageModule } from '@/infrastructure/storage/storage.module';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'storage'),
-      serveRoot: '/storage',
-      serveStaticOptions: {
-        index: false,
-      },
-    }),
-    BullmqInfrastructureModule,
-    StorageModule,
-    DatabaseModule,
-    AuthModule,
-    UsersModule,
-    NovelsModule,
-    JobsModule,
-  ],
-  controllers: [],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: SessionGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
-  ],
+    imports: [
+        ConfigModule.forRoot({
+            isGlobal: true,
+        }),
+        ServeStaticModule.forRoot({
+            rootPath: join(process.cwd(), 'storage'),
+            serveRoot: '/storage',
+            serveStaticOptions: {
+                index: false,
+            },
+        }),
+        BullmqInfrastructureModule,
+        StorageModule,
+        DatabaseModule,
+        AuthModule,
+        UsersModule,
+        NovelsModule,
+        JobsModule,
+    ],
+    controllers: [],
+    providers: [
+        {
+            provide: APP_GUARD,
+            useClass: SessionGuard,
+        },
+        {
+            provide: APP_GUARD,
+            useClass: RolesGuard,
+        },
+    ],
 })
 export class AppModule {}

@@ -16,36 +16,36 @@ const logger = new Logger(FORMAT_ID);
  *          - If prologue: captures the entire "序章、仙约" match string
  */
 const CHAPTER_HEADING_RE =
-  /(?:^|[\s\u3000]+)(?:(?=第\s*([0-9零一二两三四五六七八九十百千万]+)\s*章)|(?=(?:序|前|楔)\s*章))((?:第\s*[0-9零一二两三四五六七八九十百千万]+\s*章.*)|(?:序|前|楔)\s*章.*)$/m;
+    /(?:^|[\s\u3000]+)(?:(?=第\s*([0-9零一二两三四五六七八九十百千万]+)\s*章)|(?=(?:序|前|楔)\s*章))((?:第\s*[0-9零一二两三四五六七八九十百千万]+\s*章.*)|(?:序|前|楔)\s*章.*)$/m;
 
 export const genericCnChapterV2Definition: ParserDefinition = {
-  formatId: FORMAT_ID,
-  languageCode: Lang.CHINESE_PRC,
-  matchScore: (text: string) => {
-    const hasChapter = RegexUtils.safeTest(CHAPTER_HEADING_RE, text);
-    const score = scoreWith((scorer) => {
-      scorer.addIf(hasChapter, 5);
-    });
+    formatId: FORMAT_ID,
+    languageCode: Lang.CHINESE_PRC,
+    matchScore: (text: string) => {
+        const hasChapter = RegexUtils.safeTest(CHAPTER_HEADING_RE, text);
+        const score = scoreWith((scorer) => {
+            scorer.addIf(hasChapter, 5);
+        });
 
-    logger.log(`${FORMAT_ID} score: ${score}`);
-    return score;
-  },
-  metadata: {},
-  chapter: {
-    heading: {
-      regex: CHAPTER_HEADING_RE,
-      numberGroup: 1,
-      titleGroup: 2,
+        logger.log(`${FORMAT_ID} score: ${score}`);
+        return score;
     },
-    numberParser: (match: string) => {
-      if (!match) {
-        return 1;
-      }
-      return parseChineseChapterNumber(match) + 1;
+    metadata: {},
+    chapter: {
+        heading: {
+            regex: CHAPTER_HEADING_RE,
+            numberGroup: 1,
+            titleGroup: 2,
+        },
+        numberParser: (match: string) => {
+            if (!match) {
+                return 1;
+            }
+            return parseChineseChapterNumber(match) + 1;
+        },
+        volume: {
+            startAt: 1,
+            incrementOnReset: true,
+        },
     },
-    volume: {
-      startAt: 1,
-      incrementOnReset: true,
-    },
-  },
 };

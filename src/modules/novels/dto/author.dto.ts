@@ -1,15 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AuthorDto {
-  @ApiProperty()
-  id: string;
+    @ApiProperty()
+    id: string;
 
-  @ApiProperty()
-  name: string | null;
+    @ApiProperty()
+    name: string | null;
 
-  @ApiProperty()
-  photoUrl: string | null;
+    @ApiProperty()
+    photoUrl: string | null;
 
-  @ApiProperty()
-  biography: string | null;
+    @ApiProperty()
+    biography: string | null;
 }

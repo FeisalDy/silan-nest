@@ -4,24 +4,24 @@ import { type StorageAdapter } from '@/infrastructure/storage/interfaces/storage
 
 @Injectable()
 export class StorageService {
-  constructor(
-    @Inject(STORAGE_ADAPTER)
-    private readonly storage: StorageAdapter
-  ) {}
+    constructor(
+        @Inject(STORAGE_ADAPTER)
+        private readonly storage: StorageAdapter
+    ) {}
 
-  upload(key: string, buffer: Buffer) {
-    return this.storage.upload(key, buffer);
-  }
+    upload(key: string, buffer: Buffer) {
+        return this.storage.upload(key, buffer);
+    }
 
-  download(key: string) {
-    return this.storage.download(key);
-  }
+    download(key: string) {
+        return this.storage.download(key);
+    }
 
-  delete(key: string) {
-    return this.storage.delete(key);
-  }
+    delete(key: string) {
+        return this.storage.delete(key);
+    }
 
-  exists(key: string) {
-    return this.storage.exists(key);
-  }
+    exists(key: string) {
+        return this.storage.exists(key);
+    }
 }

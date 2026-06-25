@@ -1,40 +1,39 @@
 export class ScoreAccumulator {
-  private score = 0;
+    private score = 0;
 
-  add(points: number): this {
-    this.score += points;
-    return this;
-  }
-
-  addIf(condition: boolean, points: number): this {
-    if (condition) {
-      this.score += points;
+    add(points: number): this {
+        this.score += points;
+        return this;
     }
-    return this;
-  }
 
-  addIfAll(conditions: boolean[], points: number): this {
-    if (conditions.every(Boolean)) {
-      this.score += points;
+    addIf(condition: boolean, points: number): this {
+        if (condition) {
+            this.score += points;
+        }
+        return this;
     }
-    return this;
-  }
 
-  addIfAny(conditions: boolean[], points: number): this {
-    if (conditions.some(Boolean)) {
-      this.score += points;
+    addIfAll(conditions: boolean[], points: number): this {
+        if (conditions.every(Boolean)) {
+            this.score += points;
+        }
+        return this;
     }
-    return this;
-  }
 
-  total(): number {
-    return this.score;
-  }
+    addIfAny(conditions: boolean[], points: number): this {
+        if (conditions.some(Boolean)) {
+            this.score += points;
+        }
+        return this;
+    }
+
+    total(): number {
+        return this.score;
+    }
 }
 
 export const scoreWith = (build: (score: ScoreAccumulator) => void): number => {
-  const scorer = new ScoreAccumulator();
-  build(scorer);
-  return scorer.total();
+    const scorer = new ScoreAccumulator();
+    build(scorer);
+    return scorer.total();
 };
-

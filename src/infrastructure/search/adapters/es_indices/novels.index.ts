@@ -3,51 +3,52 @@ import { estypes } from '@elastic/elasticsearch';
 export const NOVELS_INDEX = 'novels';
 
 export const novelsIndexSettings: estypes.IndicesCreateRequest = {
-  index: NOVELS_INDEX,
+    index: NOVELS_INDEX,
 
-  settings: {
-    analysis: {
-      analyzer: {
-        default: {
-          type: 'standard',
+    settings: {
+        analysis: {
+            analyzer: {
+                default: {
+                    type: 'standard',
+                },
+            },
         },
-      },
     },
-  },
 
-  mappings: {
-    properties: {
-      id: {
-        type: 'keyword',
-      },
+    mappings: {
+        properties: {
+            id: {
+                type: 'keyword',
+            },
 
-      slug: {
-        type: 'keyword',
-      },
+            slug: {
+                type: 'keyword',
+            },
 
-      title: {
-        type: 'text', analyzer: 'standard',
-      },
+            title: {
+                type: 'text',
+                analyzer: 'standard',
+            },
 
-      aliases: {
-        type: 'text',
-      },
+            aliases: {
+                type: 'text',
+            },
 
-      description: {
-        type: 'text',
-      },
+            description: {
+                type: 'text',
+            },
 
-      author: {
-        type: 'text',
-      },
+            author: {
+                type: 'text',
+            },
 
-      language: {
-        type: 'keyword',
-      },
+            language: {
+                type: 'keyword',
+            },
 
-      createdAt: {
-        type: 'date',
-      },
+            createdAt: {
+                type: 'date',
+            },
+        },
     },
-  },
 };

@@ -16,143 +16,143 @@ import { NovelParserService } from '@/modules/jobs/services/novel-parser.service
 import { StorageService } from '@/infrastructure/storage/storage.service';
 
 export interface NovelImportResult {
-  novelId: string;
-  title: string;
-  chapterCount: number;
-  languageCode: string;
+    novelId: string;
+    title: string;
+    chapterCount: number;
+    languageCode: string;
 }
 
 @Injectable()
 export class NovelImportService {
-  constructor(
-    private readonly dataSource: DataSource,
-    private readonly storageService: StorageService,
-    private readonly novelParserService: NovelParserService
-  ) {}
+    constructor(
+        private readonly dataSource: DataSource,
+        private readonly storageService: StorageService,
+        private readonly novelParserService: NovelParserService
+    ) {}
 
-  async execute(payload: NovelImportJobPayload): Promise<NovelImportResult> {
-    const buffer = await this.storageService.download(payload.storageKey);
+    async execute(payload: NovelImportJobPayload): Promise<NovelImportResult> {
+        const buffer = await this.storageService.download(payload.storageKey);
 
-    const multerFile = {
-      originalname: payload.fileName,
-      buffer,
-    } as Express.Multer.File;
+        const multerFile = {
+            originalname: payload.fileName,
+            buffer,
+        } as Express.Multer.File;
 
-    const { parsedNovel } = this.novelParserService.previewNovelImport(
-      multerFile,
-      payload.formatId
-    );
-
-    return this.dataSource.transaction(async (manager) => {
-      let author: Author | null = null;
-
-      if (parsedNovel.author) {
-        author = await this.findOrCreateAuthor(
-          manager,
-          parsedNovel.author,
-          parsedNovel.languageCode
+        const { parsedNovel } = this.novelParserService.previewNovelImport(
+            multerFile,
+            payload.formatId
         );
-      }
 
-      const novel = await manager.save(
-        Novel,
-        manager.create(Novel, {
-          status: parsedNovel.status ?? null,
-          authorId: author?.id ?? null,
-        })
-      );
+        return this.dataSource.transaction(async (manager) => {
+            let author: Author | null = null;
 
-      await manager.save(
-        NovelTranslation,
-        manager.create(NovelTranslation, {
-          novelId: novel.id,
-          languageCode: parsedNovel.languageCode,
-          title: parsedNovel.title!,
-          synopsis: parsedNovel.synopsis,
-          slug: BuildSlug(parsedNovel.title!),
-          isDefault: true,
-        })
-      );
+            if (parsedNovel.author) {
+                author = await this.findOrCreateAuthor(
+                    manager,
+                    parsedNovel.author,
+                    parsedNovel.languageCode
+                );
+            }
 
-      for (const parsedChapter of parsedNovel.chapters) {
-        const parts = BuildChunkedChapterParts({
-          title: parsedChapter.title || null,
-          content: parsedChapter.content,
-          baseSubNumber: parsedChapter.chapterSubNumber,
-          options: {
-            maxLength: 20000,
-            breakBuffer: 2000,
-          },
+            const novel = await manager.save(
+                Novel,
+                manager.create(Novel, {
+                    status: parsedNovel.status ?? null,
+                    authorId: author?.id ?? null,
+                })
+            );
+
+            await manager.save(
+                NovelTranslation,
+                manager.create(NovelTranslation, {
+                    novelId: novel.id,
+                    languageCode: parsedNovel.languageCode,
+                    title: parsedNovel.title!,
+                    synopsis: parsedNovel.synopsis,
+                    slug: BuildSlug(parsedNovel.title!),
+                    isDefault: true,
+                })
+            );
+
+            for (const parsedChapter of parsedNovel.chapters) {
+                const parts = BuildChunkedChapterParts({
+                    title: parsedChapter.title || null,
+                    content: parsedChapter.content,
+                    baseSubNumber: parsedChapter.chapterSubNumber,
+                    options: {
+                        maxLength: 20000,
+                        breakBuffer: 2000,
+                    },
+                });
+
+                for (const part of parts) {
+                    const chapter = await manager.save(
+                        Chapter,
+                        manager.create(Chapter, {
+                            novelId: novel.id,
+                            chapterNumber: parsedChapter.chapterNumber,
+                            chapterSubNumber: part.chapterSubNumber,
+                            volumeNumber: parsedChapter.volumeNumber,
+                        })
+                    );
+
+                    await manager.save(
+                        ChapterTranslation,
+                        manager.create(ChapterTranslation, {
+                            chapterId: chapter.id,
+                            languageCode: parsedNovel.languageCode,
+                            title: part.title,
+                            content: part.content,
+                            isDefault: true,
+                        })
+                    );
+                }
+            }
+
+            return {
+                novelId: novel.id,
+                title: parsedNovel.title!,
+                chapterCount: parsedNovel.chapters.length,
+                languageCode: parsedNovel.languageCode,
+            };
         });
-
-        for (const part of parts) {
-          const chapter = await manager.save(
-            Chapter,
-            manager.create(Chapter, {
-              novelId: novel.id,
-              chapterNumber: parsedChapter.chapterNumber,
-              chapterSubNumber: part.chapterSubNumber,
-              volumeNumber: parsedChapter.volumeNumber,
-            })
-          );
-
-          await manager.save(
-            ChapterTranslation,
-            manager.create(ChapterTranslation, {
-              chapterId: chapter.id,
-              languageCode: parsedNovel.languageCode,
-              title: part.title,
-              content: part.content,
-              isDefault: true,
-            })
-          );
-        }
-      }
-
-      return {
-        novelId: novel.id,
-        title: parsedNovel.title!,
-        chapterCount: parsedNovel.chapters.length,
-        languageCode: parsedNovel.languageCode,
-      };
-    });
-  }
-
-  private async findOrCreateAuthor(
-    manager: EntityManager,
-    name: string,
-    languageCode: string
-  ): Promise<Author> {
-    const normalized = name.trim();
-
-    const existingTranslation = await manager
-      .getRepository(AuthorTranslation)
-      .createQueryBuilder('translation')
-      .leftJoinAndSelect('translation.author', 'author')
-      .where('LOWER(translation.name) = LOWER(:name)', {
-        name: normalized,
-      })
-      .andWhere('translation.languageCode = :languageCode', {
-        languageCode,
-      })
-      .getOne();
-
-    if (existingTranslation) {
-      return existingTranslation.author;
     }
 
-    const author = await manager.save(Author, manager.create(Author, {}));
+    private async findOrCreateAuthor(
+        manager: EntityManager,
+        name: string,
+        languageCode: string
+    ): Promise<Author> {
+        const normalized = name.trim();
 
-    await manager.save(
-      AuthorTranslation,
-      manager.create(AuthorTranslation, {
-        authorId: author.id,
-        languageCode,
-        name: normalized,
-        isDefault: true,
-      })
-    );
+        const existingTranslation = await manager
+            .getRepository(AuthorTranslation)
+            .createQueryBuilder('translation')
+            .leftJoinAndSelect('translation.author', 'author')
+            .where('LOWER(translation.name) = LOWER(:name)', {
+                name: normalized,
+            })
+            .andWhere('translation.languageCode = :languageCode', {
+                languageCode,
+            })
+            .getOne();
 
-    return author;
-  }
+        if (existingTranslation) {
+            return existingTranslation.author;
+        }
+
+        const author = await manager.save(Author, manager.create(Author, {}));
+
+        await manager.save(
+            AuthorTranslation,
+            manager.create(AuthorTranslation, {
+                authorId: author.id,
+                languageCode,
+                name: normalized,
+                isDefault: true,
+            })
+        );
+
+        return author;
+    }
 }

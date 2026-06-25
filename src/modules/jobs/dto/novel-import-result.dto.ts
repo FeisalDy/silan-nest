@@ -1,6 +1,6 @@
 export interface NovelImportResult {
-  novelId: string;
-  title: string;
-  chapterCount: number;
-  languageCode: string;
+    novelId: string;
+    title: string;
+    chapterCount: number;
+    languageCode: string;
 }

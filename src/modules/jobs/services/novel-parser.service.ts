@@ -6,49 +6,49 @@ import { NovelParserRegistry } from '@/modules/novels/parsers/novel-parser.regis
 
 @Injectable()
 export class NovelParserService {
-  constructor(private readonly parserRegistry: NovelParserRegistry) {}
-  previewNovelImport(
-    file: Express.Multer.File,
-    formatId?: string,
-    chapterLimit?: number
-  ) {
-    const { parsedNovel, formatId: resolvedFormatId } = this.parseNovel(
-      file,
-      formatId,
-      chapterLimit
-    );
+    constructor(private readonly parserRegistry: NovelParserRegistry) { }
+    previewNovelImport(
+        file: Express.Multer.File,
+        formatId?: string,
+        chapterLimit?: number
+    ) {
+        const { parsedNovel, formatId: resolvedFormatId } = this.parseNovel(
+            file,
+            formatId,
+            chapterLimit
+        );
 
-    if (!parsedNovel.title) {
-      const cleanFileName = FilenameUtil.normalize(file.originalname);
+        if (!parsedNovel.title) {
+            const cleanFileName = FilenameUtil.normalize(file.originalname);
 
-      parsedNovel.title = NovelTitleGenerator.generate({
-        fileName: cleanFileName,
-        firstChapterTitle: parsedNovel.chapters[0]?.title,
-        languageCode: parsedNovel.languageCode,
-      });
+            parsedNovel.title = NovelTitleGenerator.generate({
+                fileName: cleanFileName,
+                firstChapterTitle: parsedNovel.chapters[0]?.title,
+                languageCode: parsedNovel.languageCode,
+            });
+        }
+
+        return { parsedNovel, resolvedFormatId };
     }
 
-    return { parsedNovel, resolvedFormatId };
-  }
+    private parseNovel(
+        file: Express.Multer.File,
+        formatId?: string,
+        chapterLimit?: number
+    ) {
+        // Limit the filesize to 64kb for format detection, so instead of O(file-size),
+        // its O(256kb) which is much faster for large files and still enough for format detection
+        const sample = TextDecoderUtil.decode(file.buffer.subarray(0, 64_000));
 
-  private parseNovel(
-    file: Express.Multer.File,
-    formatId?: string,
-    chapterLimit?: number
-  ) {
-    // Limit the filesize to 64kb for format detection, so instead of O(file-size),
-    // its O(256kb) which is much faster for large files and still enough for format detection
-    const sample = TextDecoderUtil.decode(file.buffer.subarray(0, 64_000));
+        const parser = formatId
+            ? this.parserRegistry.getByFormatId(formatId)
+            : this.parserRegistry.detect(sample);
 
-    const parser = formatId
-      ? this.parserRegistry.getByFormatId(formatId)
-      : this.parserRegistry.detect(sample);
+        const fullText = TextDecoderUtil.decode(file.buffer);
 
-    const fullText = TextDecoderUtil.decode(file.buffer);
-
-    return {
-      formatId: parser.formatId,
-      parsedNovel: parser.parse(fullText, chapterLimit),
-    };
-  }
+        return {
+            formatId: parser.formatId,
+            parsedNovel: parser.parse(fullText, chapterLimit),
+        };
+    }
 }

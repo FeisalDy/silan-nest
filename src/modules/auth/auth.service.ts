@@ -9,85 +9,85 @@ import * as bcrypt from 'bcrypt';
 import { AuthUser } from '../users/interfaces/auth-user.interface';
 @Injectable()
 export class AuthService {
-  constructor(
-    @InjectRepository(Session)
-    private readonly sessionRepo: Repository<Session>,
+    constructor(
+        @InjectRepository(Session)
+        private readonly sessionRepo: Repository<Session>,
 
-    private readonly usersService: UsersService
-  ) {}
+        private readonly usersService: UsersService
+    ) {}
 
-  async login(user: User, ipAddress?: string, userAgent?: string) {
-    const plainToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(plainToken)
-      .digest('hex');
+    async login(user: User, ipAddress?: string, userAgent?: string) {
+        const plainToken = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto
+            .createHash('sha256')
+            .update(plainToken)
+            .digest('hex');
 
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
 
-    const session = this.sessionRepo.create({
-      user,
-      tokenHash,
-      ipAddress,
-      userAgent,
-      expiresAt,
-    });
+        const session = this.sessionRepo.create({
+            user,
+            tokenHash,
+            ipAddress,
+            userAgent,
+            expiresAt,
+        });
 
-    await this.sessionRepo.save(session);
+        await this.sessionRepo.save(session);
 
-    console.log(user);
+        console.log(user);
 
-    return {
-      accessToken: plainToken,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role.name,
-      },
-    };
-  }
-  async validateUser(email: string, pass: string): Promise<User | null> {
-    const user = await this.usersService.findOneByEmail(email);
-    if (!user) return null;
-
-    const isMatch = await bcrypt.compare(pass, user.passwordHash);
-    if (isMatch) {
-      return user;
+        return {
+            accessToken: plainToken,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role.name,
+            },
+        };
     }
-    return null;
-  }
-  async validateSession(plainToken: string): Promise<AuthUser> {
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(plainToken)
-      .digest('hex');
+    async validateUser(email: string, pass: string): Promise<User | null> {
+        const user = await this.usersService.findOneByEmail(email);
+        if (!user) return null;
 
-    const session = await this.sessionRepo.findOne({
-      where: { tokenHash: tokenHash },
-      relations: ['user', 'user.role'], // Join user and role for authorization
-    });
+        const isMatch = await bcrypt.compare(pass, user.passwordHash);
+        if (isMatch) {
+            return user;
+        }
+        return null;
+    }
+    async validateSession(plainToken: string): Promise<AuthUser> {
+        const tokenHash = crypto
+            .createHash('sha256')
+            .update(plainToken)
+            .digest('hex');
 
-    if (!session || session.expiresAt < new Date()) {
-      // TODO: Let expired sessions naturally fail or Run a background jobs / cron cleanup instead
-      if (session) await this.sessionRepo.remove(session); // Cleanup expired
-      throw new UnauthorizedException('Invalid or expired session');
+        const session = await this.sessionRepo.findOne({
+            where: { tokenHash: tokenHash },
+            relations: ['user', 'user.role'], // Join user and role for authorization
+        });
+
+        if (!session || session.expiresAt < new Date()) {
+            // TODO: Let expired sessions naturally fail or Run a background jobs / cron cleanup instead
+            if (session) await this.sessionRepo.remove(session); // Cleanup expired
+            throw new UnauthorizedException('Invalid or expired session');
+        }
+
+        return {
+            id: session.user.id,
+            email: session.user.email,
+            role: session.user.role.name,
+        };
     }
 
-    return {
-      id: session.user.id,
-      email: session.user.email,
-      role: session.user.role.name,
-    };
-  }
-
-  async logout(plainToken: string) {
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(plainToken)
-      .digest('hex');
-    await this.sessionRepo.delete({ tokenHash: tokenHash });
-    return { message: 'Logged out successfully' };
-  }
+    async logout(plainToken: string) {
+        const tokenHash = crypto
+            .createHash('sha256')
+            .update(plainToken)
+            .digest('hex');
+        await this.sessionRepo.delete({ tokenHash: tokenHash });
+        return { message: 'Logged out successfully' };
+    }
 }

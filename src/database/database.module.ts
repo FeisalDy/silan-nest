@@ -4,6 +4,6 @@ import { typeOrmConfig } from './typeorm.config';
 
 @Global()
 @Module({
-  imports: [TypeOrmModule.forRoot(typeOrmConfig)],
+    imports: [TypeOrmModule.forRoot(typeOrmConfig)],
 })
 export class DatabaseModule {}

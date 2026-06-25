@@ -1,14 +1,14 @@
 import { setSeederFactory } from 'typeorm-extension';
-import {AuthorTranslation} from '@/modules/novels/entities/author-translation.entity';
+import { AuthorTranslation } from '@/modules/novels/entities/author-translation.entity';
 
-export default setSeederFactory(AuthorTranslation, (faker)=>{
-  const translation = new AuthorTranslation();
+export default setSeederFactory(AuthorTranslation, (faker) => {
+    const translation = new AuthorTranslation();
 
-  translation.name = faker.person.fullName();
+    translation.name = faker.person.fullName();
 
-  translation.biography = faker.lorem.paragraphs(2);
+    translation.biography = faker.lorem.paragraphs(2);
 
-  translation.isDefault = false;
+    translation.isDefault = false;
 
-  return translation
-})
+    return translation;
+});

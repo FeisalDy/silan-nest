@@ -1,30 +1,30 @@
 import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  OneToMany,
-  PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    Entity,
+    OneToMany,
+    PrimaryGeneratedColumn,
 } from 'typeorm';
 import { AuthorTranslation } from './author-translation.entity';
 import { Novel } from './novel.entity';
 
 @Entity('authors')
 export class Author {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-  @Column({ name: 'photo_url', type: 'varchar', length: 255, nullable: true })
-  photoUrl: string | null;
+    @Column({ name: 'photo_url', type: 'varchar', length: 255, nullable: true })
+    photoUrl: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
 
-  @OneToMany(
-    () => AuthorTranslation,
-    (translation: AuthorTranslation) => translation.author,
-  )
-  translations: AuthorTranslation[];
+    @OneToMany(
+        () => AuthorTranslation,
+        (translation: AuthorTranslation) => translation.author
+    )
+    translations: AuthorTranslation[];
 
-  @OneToMany(() => Novel, (novel: Novel) => novel.author)
-  novels: Novel[];
+    @OneToMany(() => Novel, (novel: Novel) => novel.author)
+    novels: Novel[];
 }

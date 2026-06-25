@@ -2,8 +2,8 @@ import type { Seeder } from 'typeorm-extension';
 import { DataSource } from 'typeorm';
 
 export default class ResetSeeder implements Seeder {
-  async run(dataSource: DataSource): Promise<void> {
-    await dataSource.query(`
+    async run(dataSource: DataSource): Promise<void> {
+        await dataSource.query(`
       TRUNCATE TABLE
         users,
         password_reset_tokens,
@@ -18,5 +18,5 @@ export default class ResetSeeder implements Seeder {
         chapter_translations
       RESTART IDENTITY CASCADE;
     `);
-  }
+    }
 }

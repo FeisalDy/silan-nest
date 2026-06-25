@@ -5,17 +5,17 @@ import { sfacgMetaChapterV1Definition } from './sfacg-meta-chapter-v1.definition
 import { unknownMetaChapterV1Definition } from './unknown-meta-chapter-v1.definition';
 import { xsqishuMetaChapterV1Definition } from './xsqishu-meta-chapter-v1.defination';
 export const parserDefinitions: ParserDefinition[] = [
-  genericCnChapterV1Definition,
-  genericCnChapterV2Definition,
-  sfacgMetaChapterV1Definition,
-  unknownMetaChapterV1Definition,
-  xsqishuMetaChapterV1Definition,
+    genericCnChapterV1Definition,
+    genericCnChapterV2Definition,
+    sfacgMetaChapterV1Definition,
+    unknownMetaChapterV1Definition,
+    xsqishuMetaChapterV1Definition,
 ];
 
 export {
-  genericCnChapterV1Definition,
-  genericCnChapterV2Definition,
-  sfacgMetaChapterV1Definition,
-  unknownMetaChapterV1Definition,
-  xsqishuMetaChapterV1Definition,
+    genericCnChapterV1Definition,
+    genericCnChapterV2Definition,
+    sfacgMetaChapterV1Definition,
+    unknownMetaChapterV1Definition,
+    xsqishuMetaChapterV1Definition,
 };

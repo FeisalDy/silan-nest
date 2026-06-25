@@ -1,43 +1,43 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ChapterDto {
-  @ApiProperty()
-  id: string;
+    @ApiProperty()
+    id: string;
 
-  @ApiProperty()
-  novelId: string;
+    @ApiProperty()
+    novelId: string;
 
-  @ApiProperty()
-  chapterNumber: number;
+    @ApiProperty()
+    chapterNumber: number;
 
-  @ApiProperty()
-  chapterSubNumber: number;
+    @ApiProperty()
+    chapterSubNumber: number;
 
-  @ApiProperty()
-  volumeNumber: number;
+    @ApiProperty()
+    volumeNumber: number;
 
-  @ApiProperty()
-  languageCode: string;
+    @ApiProperty()
+    languageCode: string;
 
-  @ApiProperty()
-  title: string | null;
+    @ApiProperty()
+    title: string | null;
 
-  @ApiProperty()
-  content: string;
+    @ApiProperty()
+    content: string;
 
-  @ApiPropertyOptional()
-  navigation?: {
-    prev: {
-      volumeNumber: number;
-      chapterNumber: number;
-      chapterSubNumber: number;
-    } | null;
-    next: {
-      volumeNumber: number;
-      chapterNumber: number;
-      chapterSubNumber: number;
-    } | null;
-  };
-  @ApiProperty()
-  createdAt: Date;
+    @ApiPropertyOptional()
+    navigation?: {
+        prev: {
+            volumeNumber: number;
+            chapterNumber: number;
+            chapterSubNumber: number;
+        } | null;
+        next: {
+            volumeNumber: number;
+            chapterNumber: number;
+            chapterSubNumber: number;
+        } | null;
+    };
+    @ApiProperty()
+    createdAt: Date;
 }

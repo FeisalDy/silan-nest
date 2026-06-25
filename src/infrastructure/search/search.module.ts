@@ -11,48 +11,60 @@ import { isTruthyEnv } from '@/common/utils/is-truthy-env.util';
 
 @Module({})
 export class SearchModule {
-  static register(): DynamicModule {
-    return {
-      module: SearchModule,
+    static register(): DynamicModule {
+        return {
+            module: SearchModule,
 
-      imports: [
-        ElasticsearchModule.registerAsync({
-          inject: [ConfigService],
+            imports: [
+                ElasticsearchModule.registerAsync({
+                    inject: [ConfigService],
 
-          useFactory: (config: ConfigService) => ({
-            node: config.get('ELASTICSEARCH_NODE'),
-            auth: {
-              username: config.get<string>('ELASTICSEARCH_USERNAME', 'elastic'),
-              password: config.get<string>('ELASTICSEARCH_PASSWORD', ''),
-            },
+                    useFactory: (config: ConfigService) => ({
+                        node: config.get('ELASTICSEARCH_NODE'),
+                        auth: {
+                            username: config.get<string>(
+                                'ELASTICSEARCH_USERNAME',
+                                'elastic'
+                            ),
+                            password: config.get<string>(
+                                'ELASTICSEARCH_PASSWORD',
+                                ''
+                            ),
+                        },
 
-            tls: {
-              rejectUnauthorized: false,
-            },
-          }),
-        }),
-      ],
+                        tls: {
+                            rejectUnauthorized: false,
+                        },
+                    }),
+                }),
+            ],
 
-      providers: [
-        SearchService,
-        IndexManagerService,
-        ElasticsearchAdapter,
-        NoopSearchAdapter,
-        {
-          provide: SEARCH_ADAPTER,
+            providers: [
+                SearchService,
+                IndexManagerService,
+                ElasticsearchAdapter,
+                NoopSearchAdapter,
+                {
+                    provide: SEARCH_ADAPTER,
 
-          inject: [ConfigService, ElasticsearchAdapter, NoopSearchAdapter],
-          useFactory: (
-            config: ConfigService,
-            real: ElasticsearchAdapter,
-            dummy: NoopSearchAdapter
-          ) => {
-            const enabled = isTruthyEnv(config.get('ELASTICSEARCH_ENABLED'));
-            return enabled ? real : dummy;
-          },
-        },
-      ],
-      exports: [SearchService],
-    };
-  }
+                    inject: [
+                        ConfigService,
+                        ElasticsearchAdapter,
+                        NoopSearchAdapter,
+                    ],
+                    useFactory: (
+                        config: ConfigService,
+                        real: ElasticsearchAdapter,
+                        dummy: NoopSearchAdapter
+                    ) => {
+                        const enabled = isTruthyEnv(
+                            config.get('ELASTICSEARCH_ENABLED')
+                        );
+                        return enabled ? real : dummy;
+                    },
+                },
+            ],
+            exports: [SearchService],
+        };
+    }
 }
