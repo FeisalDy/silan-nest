@@ -14,6 +14,7 @@ import { StorageModule } from '@/infrastructure/storage/storage.module';
 import { NovelBulkImportProcessor } from '@/modules/jobs/processors/novel-bulk-import.processor';
 import { NovelBulkImportService } from '@/modules/jobs/services/novel-bulk-import.service';
 import { NovelParserService } from '@/modules/jobs/services/novel-parser.service';
+import { JobsRetryService } from './services/jobs-retry.service';
 
 @Module({
     imports: [
@@ -33,6 +34,7 @@ import { NovelParserService } from '@/modules/jobs/services/novel-parser.service
         NovelBulkImportService,
         NovelBulkImportProcessor,
         NovelParserService,
+        JobsRetryService,
     ],
     controllers: [JobsController],
 })

@@ -31,6 +31,7 @@ import { ZipValidatorUtil } from '@/common/utils/validate-zip.util';
 import { NovelParserService } from '@/modules/jobs/services/novel-parser.service';
 import { GetJobsQueryRequestDto } from '@/modules/jobs/dto/get-jobs-query.request.dto';
 import { RetryFilterDto } from './dto/retry-filter.request.dto';
+import { JobsRetryService } from './services/jobs-retry.service';
 
 @Roles(Role.EDITOR)
 @ApiTags('Jobs')
@@ -40,7 +41,8 @@ import { RetryFilterDto } from './dto/retry-filter.request.dto';
 export class JobsController {
     constructor(
         private readonly jobsService: JobsService,
-        private readonly novelParserService: NovelParserService
+        private readonly novelParserService: NovelParserService,
+        private readonly jobsRetryService: JobsRetryService
     ) { }
     @Get()
     async getAllWithPagination(
@@ -176,17 +178,17 @@ export class JobsController {
 
     @Post('retry/preview')
     async previewRetry(@Body() filter: RetryFilterDto) {
-        return this.jobsService.previewRetry(filter);
+        return this.jobsRetryService.previewRetry(filter);
     }
 
     @Post('retry/bulk')
     async retryBulk(@Body() filter: RetryFilterDto) {
-        return this.jobsService.retryMany(filter);
+        return this.jobsRetryService.retryMany(filter);
     }
 
     @Post(':jobId/retry')
     async retryOne(@Param('jobId') jobId: string) {
-        return this.jobsService.retryFailedJob(jobId);
+        return this.jobsRetryService.retry(jobId);
     }
 
     @Patch(':jobId/status')
